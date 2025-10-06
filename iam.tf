@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 1.6.0"
   required_providers {
-    aws = { source = "hashicorp/aws", version = ">= 5.40.0" }
+    aws    = { source = "hashicorp/aws",   version = ">= 5.40.0" }
     random = { source = "hashicorp/random", version = ">= 3.5.1" }
   }
 }
@@ -18,13 +18,12 @@ locals {
   role_name = var.add_random_suffix ? "${local.base_name}-${random_id.suffix[0].hex}" : local.base_name
 }
 
-# Trust (who can assume the role)
 data "aws_iam_policy_document" "trust" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
-      identifiers = [var.trust_service]   # e.g., lambda.amazonaws.com
+      identifiers = [var.trust_service]   # e.g., lambda.amazonaws.com, scheduler.amazonaws.com, synthetics.amazonaws.com
     }
   }
 }
@@ -35,14 +34,12 @@ resource "aws_iam_role" "this" {
   tags               = local.tags
 }
 
-# Optional: basic logs for Lambda (safe to keep true if trust is lambda)
 resource "aws_iam_role_policy_attachment" "basic_logs" {
   count      = var.attach_basic_logs ? 1 : 0
   role       = aws_iam_role.this.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Optional: attach any extra managed policies
 resource "aws_iam_role_policy_attachment" "extra" {
   for_each   = toset(var.managed_policy_arns)
   role       = aws_iam_role.this.name
