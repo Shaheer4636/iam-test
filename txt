@@ -1,6 +1,1 @@
-SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-
-
-
-The pipeline is not valid. Job Job: Step AWSShellScript input awsCredentials references service connection SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations which could not be found. The service connection does not exist, has been disabled or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz.
+The pipeline is not valid. Job Job: Step AWSShellScript input awsCredentials expects a service connection of type AWS but the provided service connection SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations is of type AWSServiceEndpoint.
