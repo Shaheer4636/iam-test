@@ -1,10 +1,3 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-
 trigger: none
 
 parameters:
@@ -13,16 +6,44 @@ parameters:
   type: boolean
   default: true
 
-stages:
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox                      # must equal var.env
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSCVPC-Infrastructure Operations
-    tfVersion: "1.13.3"
-    application: QuickSetup                   # must equal var.appname
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.tfPlanOnly }}
-    regionName: us-east-1                     # must equal var.region
-    checkoutTemplate: gitCheckouts.yml
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- checkout: self
+
+- script: |
+    set -e
+    curl -sLo tf.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
+    unzip -o tf.zip
+    sudo mv terraform /usr/local/bin/terraform
+    terraform -version
+  displayName: Install Terraform 1.6.6
+
+# Plan
+- task: AWSShellScript@1
+  displayName: Terraform init + plan
+  inputs:
+    awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations'  # EDIT if your name differs
+    regionName: 'us-east-1'
+    scriptType: 'bash'
+    inlineScript: |
+      set -e
+      terraform init -input=false
+      terraform validate
+      terraform plan -input=false -var-file vars/sandbox.tfvars -out tf.plan
+
+- publish: tf.plan
+  artifact: tfplan
+
+# Apply (only when tfPlanOnly = false)
+- ${{ if not(parameters.tfPlanOnly) }}:
+  - task: AWSShellScript@1
+    displayName: Terraform apply
+    inputs:
+      awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations'  # same as above
+      regionName: 'us-east-1'
+      scriptType: 'bash'
+      inlineScript: |
+        set -e
+        terraform apply -input=false -auto-approve tf.plan
