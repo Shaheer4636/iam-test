@@ -1,10 +1,37 @@
+# azure-pipelines.yml  — Terraform (IAM only) with S3 backend
 trigger: none
 
+# ---------- RUN-TIME PARAMETERS ----------
 parameters:
 - name: tfPlanOnly
   displayName: Terraform plan only (no apply)
   type: boolean
   default: true
+- name: regionName
+  displayName: AWS region
+  type: string
+  default: 'us-east-1'
+- name: useS3Backend
+  displayName: Use S3 backend for Terraform state
+  type: boolean
+  default: true
+- name: s3Bucket
+  displayName: S3 bucket for TF state
+  type: string
+  default: 'samc-obs-tfstate'  # <-- EDIT to your bucket
+- name: s3Key
+  displayName: S3 key (path) for TF state
+  type: string
+  default: 'iam-only/sandbox/terraform.tfstate'  # <-- EDIT if you want
+- name: dynamoTable
+  displayName: DynamoDB table for TF state lock
+  type: string
+  default: 'samc-obs-tflock'  # <-- EDIT to your table
+
+# ---------- PIPELINE VARIABLES ----------
+variables:
+  # CHANGE THIS TO MATCH THE EXACT SERVICE CONNECTION NAME IN THIS PROJECT
+  AWS_SC_REGIONAL: 'SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations'
 
 pool:
   vmImage: ubuntu-latest
@@ -12,6 +39,7 @@ pool:
 steps:
 - checkout: self
 
+# Install a pinned Terraform version
 - script: |
     set -e
     curl -sLo tf.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
@@ -20,30 +48,70 @@ steps:
     terraform -version
   displayName: Install Terraform 1.6.6
 
-# Plan
+# Create backend.hcl only when using S3 backend (this is your "terra connection string")
+- ${{ if eq(parameters.useS3Backend, true) }}:
+  - script: |
+      cat > backend.hcl <<'EOF'
+      bucket         = "${{ parameters.s3Bucket }}"
+      key            = "${{ parameters.s3Key }}"
+      region         = "${{ parameters.regionName }}"
+      dynamodb_table = "${{ parameters.dynamoTable }}"
+      encrypt        = true
+      EOF
+      echo "Wrote backend.hcl:"
+      cat backend.hcl
+    displayName: Write backend.hcl (S3 state)
+
+# Plan (verbose + time-boxed)
 - task: AWSShellScript@1
-  displayName: Terraform init + plan
+  displayName: Terraform init + plan (verbose)
+  timeoutInMinutes: 20
+  env:
+    TF_LOG: INFO
+    TF_LOG_PATH: $(Build.SourcesDirectory)/terraform.log
+    TF_PLUGIN_CACHE_DIR: $(Pipeline.Workspace)/.tfcache
+    USE_S3: ${{ parameters.useS3Backend }}
   inputs:
-    awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations'  # EDIT if your name differs
-    regionName: 'us-east-1'
+    awsCredentials: '$(AWS_SC_REGIONAL)'
+    regionName: '${{ parameters.regionName }}'
     scriptType: 'bash'
     inlineScript: |
-      set -e
-      terraform init -input=false
-      terraform validate
-      terraform plan -input=false -var-file vars/sandbox.tfvars -out tf.plan
+      set -euxo pipefail
+      echo "== whoami ==" && whoami
+      echo "== ls ==" && ls -la
 
+      echo "== network probes =="
+      curl -sSfI https://registry.terraform.io/v1/providers/hashicorp/aws/versions || echo "registry.terraform.io unreachable"
+      curl -sSfI https://releases.hashicorp.com/terraform-provider-aws/ || echo "releases.hashicorp.com unreachable"
+
+      echo "== terraform init =="
+      if [ "${USE_S3,,}" = "true" ]; then
+        timeout 600 terraform init -input=false -upgrade -no-color -backend-config=backend.hcl
+      else
+        timeout 600 terraform init -input=false -upgrade -no-color
+      fi
+
+      echo "== terraform validate =="
+      terraform validate -no-color
+
+      echo "== terraform plan =="
+      timeout 600 terraform plan -input=false -no-color -var-file vars/sandbox.tfvars -out tf.plan
+
+# Publish artifacts (plan + log)
 - publish: tf.plan
   artifact: tfplan
+- publish: $(Build.SourcesDirectory)/terraform.log
+  artifact: tflog
 
-# Apply (only when tfPlanOnly = false)
+# Apply only if tfPlanOnly = false
 - ${{ if not(parameters.tfPlanOnly) }}:
   - task: AWSShellScript@1
     displayName: Terraform apply
+    timeoutInMinutes: 20
     inputs:
-      awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSCVPC-us-east-1-Infrastructure Operations'  # same as above
-      regionName: 'us-east-1'
+      awsCredentials: '$(AWS_SC_REGIONAL)'
+      regionName: '${{ parameters.regionName }}'
       scriptType: 'bash'
       inlineScript: |
-        set -e
+        set -euxo pipefail
         terraform apply -input=false -auto-approve tf.plan
