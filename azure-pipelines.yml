@@ -4,41 +4,33 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/7.7.0
-    - repository: vpc
+    - repository: s3
       type: git
-      name: DEVOPS_Platform_as_a_Service/vpc
+      name: DEVOPS_Platform_as_a_Service/s3
       ref: refs/tags/4.2.0
-    - repository: security-groups
-      type: git
-      name: DEVOPS_Platform_as_a_Service/security-groups
-      ref: refs/tags/2.40.0
-    - repository: iam-controls
-      type: git
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/3.0.0
 
 trigger: none
 
 parameters:
 - name: sandbox
-  displayName: Deploy QuickSetup vpc sandbox env to DevopsSandbox 889050139813
+  displayName: Deploy S3 to sandbox
   type: boolean
-  default: false
+  default: true
 - name: terrformPLANonly
   displayName: tfPlanOnly (check == true)
   type: boolean
   default: false
 
 stages:
-  - template: deploy/tf-create-infra-template.yml@templates
-    parameters:
-      environment: sandbox
-      environmentDisplayName: sandbox
-      tfServiceConnection: DevopsSandbox-889050139813-DevopsIACSvcVpc-us-east-1
-      awsServiceConnection: DevopsSandbox-889050139813-DevopsIACSvcVpc
-      tfVersion: 1.13.3
-      application: QuickSetup
-      pipelineSrcDir: $(Build.Repository.Name)
-      tfPlanOnly: ${{ parameters.terrformPLANonly }}
-      regionName: us-east-1
-      checkoutTemplate: gitCheckouts.yml
+- template: deploy/tf-create-infra-template.yml@templates
+  parameters:
+    environment: sandbox
+    environmentDisplayName: sandbox
+    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+    tfVersion: 1.13.3
+    application: ClientUptime
+    pipelineSrcDir: $(Build.Repository.Name)
+    tfPlanOnly: ${{ parameters.terrformPLANonly }}
+    regionName: us-east-1
+    checkoutTemplate: gitCheckouts.yml
