@@ -1,59 +1,13 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-
-trigger: none
-
-variables:
-- group: CrossProjectGitPAT   # contains secret ADO_PAT
-
-parameters:
-- name: sandbox
-  displayName: Deploy s3 to samc
-  type: boolean
-  default: false
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
-
-stages:
-- stage: PreFetchS3Repo
-  displayName: Fetch s3 repo using PAT
-  jobs:
-  - job: Fetch
-    pool:
-      vmImage: ubuntu-latest
-    steps:
-      - checkout: self
-      - script: |
-          set -euo pipefail
-          : "${ADO_PAT:?ADO_PAT secret variable must be set}"
-          REPO_URL="https://$(System.CollectionUri)$(System.TeamProject)/_git/DEVOPS_Platform_as_a_Service/s3"
-          # Convert to plain host form for curl-compatible auth
-          CLEAN_URL="${REPO_URL#https://}"
-          git -c http.sslVerify=true \
-              -c http.extraheader="AUTHORIZATION: basic $(printf :$ADO_PAT | base64 -w0)" \
-              ls-remote "https://${CLEAN_URL}" >/dev/null
-        displayName: "Verify PAT can reach cross-project repo"
-
-# Your deploy stage using the template
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    application: QuickSetup
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-    checkoutTemplate: gitCheckouts.yml
+ted and elapsed
+Just now
+<1s
+Related
+0 work items
+0 artifacts
+Tests and coverage
+Get started
+Errors
+1
+The pipeline is not valid. Job Terraform_Deploy: Variable group ArtifactoryReadOnlyAcct could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz Job Terraform_Deploy: Variable group AzureGitCreds could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz
+20251007.18
+View documentation for troubleshooting failed runs
