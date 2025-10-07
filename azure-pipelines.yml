@@ -1,5 +1,9 @@
 resources:
   repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/7.7.0
     - repository: s3
       type: git
       name: DEVOPS_Platform_as_a_Service/s3
@@ -7,7 +11,7 @@ resources:
 
 trigger: none
 
-# Add groups so the template compiles
+# Only needed if your org requires these groups; otherwise remove this block.
 variables:
 - group: CrossProjectGitPAT
 - group: ArtifactoryReadOnlyAcct
@@ -18,21 +22,53 @@ parameters:
   displayName: Deploy S3 to SAMC
   type: boolean
   default: false
-- name: terrformPLANonly
+- name: terraformPLANonly
   displayName: tfPlanOnly (check == true)
   type: boolean
   default: false
 
 stages:
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: SAMC
-    environmentDisplayName: SAMC
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    application: QuickSetup
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-    checkoutTemplate: gitCheckouts.yml
+- ${{ if eq(parameters.sandbox, true) }}:
+  - template: deploy/tf-create-infra-template.yml@templates
+    parameters:
+      # MUST match your vars/<env>.tfvars (env, appname)
+      environment: sandbox
+      environmentDisplayName: sandbox
+      application: QuickSetup
+
+      # Service connections (type must be AWS)
+      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+
+      regionName: us-east-1
+      tfVersion: 1.3.3
+      tfPlanOnly: ${{ parameters.terraformPLANonly }}
+
+      # Folder that contains your Terraform for S3 (main.tf, vars/, etc.)
+      pipelineSrcDir: $(Build.SourcesDirectory)/s3
+
+      # Template expects a checkout template filename from the templates repo
+      checkoutTemplate: gitCheckouts.yml
+
+      # Enable only S3 module paths; disable everything else
+      reqS3Mod: true
+      reqEKSMod: false
+      reqMongoMod: false
+      reqDocDB: false
+      reqSSRS: false
+      reqRDSmssqlMod: false
+      reqRDSaurora: false
+      reqRDSauroraPg: false
+      reqAmazonMQMod: false
+      reqRDSmysqlMod: false
+      reqRDSoracleMod: false
+      reqEc2Mod: false
+      reqElasticsearchMod: false
+      reqElasticbeanStalkMod: false
+      reqElasticacheMod: false
+
+      # Skip JFrog/zip bits
+      folderToZip: NONE
+      JFrogFileName: NONE
+      JFrogFolderName: NONE
+      JFrogFileDestination: lambdas
