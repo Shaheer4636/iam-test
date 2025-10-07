@@ -1,32 +1,4 @@
-Terraform init/plan/apply (AWS creds)
-
-View raw log
-
-Starting: Terraform init/plan/apply (AWS creds)
-==============================================================================
-Task         : AWS Shell Script
-Description  : Run a shell script using Bash with AWS credentials as environment variables
-Version      : 1.22.0
-Author       : Amazon Web Services
-Help         : Runs a shell script in Bash, setting AWS credentials and region information into the shell environment using the standard environment keys _AWS_ACCESS_KEY_ID_, _AWS_SECRET_ACCESS_KEY_, _AWS_SESSION_TOKEN_ and _AWS_REGION_.
-
-More information on this task can be found in the [task reference](https://docs.aws.amazon.com/vsts/latest/userguide/awsshell.html).
-
-####Task Permissions
-Permissions for this task to call AWS service APIs depend on the activities in the supplied script.
-==============================================================================
-Configuring credentials for task
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-Skipping OIDC: not enabled in service connections
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-...endpoint defines standard access/secret key credentials
-Configuring region for task
-...configured to use region us-east-1, defined in task.
-/usr/bin/bash /home/vsts/work/_temp/awsshellscript_2406.sh
-Configure ADO bearer header so terraform can fetch cross-project module...
-Sanity: list remote of shared module repo (should succeed)
-fatal: repository 'https://dev.azure.com/samcado/Infrastructure%20Operations/_git/DEVOPS_Platform_as_a_Service/s3/' not found
-
-##[error]Error: The process '/usr/bin/bash' failed with exit code 128
-Finishing: Terraform init/plan/apply (AWS creds)
+module "s3" {
+  source = "git::https://dev.azure.com/samcado/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=${var.module_ref}"
+  # ...rest of your inputs...
+}
