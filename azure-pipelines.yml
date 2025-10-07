@@ -1,119 +1,30 @@
-variable "aws_region" {
-  description = "AWS region to deploy into"
-  type        = string
-  default     = "us-east-1"
-}
+Starting: Terraform init/plan/apply (AWS creds)
+==============================================================================
+Task         : AWS Shell Script
+Description  : Run a shell script using Bash with AWS credentials as environment variables
+Version      : 1.22.0
+Author       : Amazon Web Services
+Help         : Runs a shell script in Bash, setting AWS credentials and region information into the shell environment using the standard environment keys _AWS_ACCESS_KEY_ID_, _AWS_SECRET_ACCESS_KEY_, _AWS_SESSION_TOKEN_ and _AWS_REGION_.
 
-variable "bucket_name" {
-  description = "S3 bucket name (will be lowercased)"
-  type        = string
-}
+More information on this task can be found in the [task reference](https://docs.aws.amazon.com/vsts/latest/userguide/awsshell.html).
 
-variable "versioning_enabled" {
-  description = "Enable S3 versioning"
-  type        = bool
-  default     = true
-}
-
-variable "force_destroy" {
-  description = "Allow destroy even with non-empty bucket"
-  type        = bool
-  default     = false
-}
-
-variable "block_public_acls" {
-  type    = bool
-  default = true
-}
-
-variable "block_public_policy" {
-  type    = bool
-  default = true
-}
-
-variable "ignore_public_acls" {
-  type    = bool
-  default = true
-}
-
-variable "restrict_public_buckets" {
-  type    = bool
-  default = true
-}
-
-variable "control_object_ownership" {
-  description = "Enable/disable object ownership control toggle in module"
-  type        = bool
-  default     = true
-}
-
-variable "object_ownership" {
-  description = "Valid values: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter"
-  type        = string
-  default     = "BucketOwnerEnforced"
-}
-
-variable "object_lock_enabled" {
-  type    = bool
-  default = false
-}
-
-variable "object_lock_configuration" {
-  description = "Pass-through to module; set to null if unused"
-  type        = any
-  default     = null
-}
-
-variable "lifecycle_rule" {
-  description = "List of lifecycle rule objects expected by the module"
-  type        = any
-  default     = []
-}
-
-variable "server_side_encryption_configuration" {
-  description = "Server-side encryption configuration object for the bucket"
-  type        = any
-  default     = null
-}
-
-variable "bucket_policy_json" {
-  description = "Complete bucket policy JSON (string). Leave empty for none."
-  type        = string
-  default     = null
-}
-
-variable "continuous_backups_enabled" {
-  description = "Tag only, for your internal reporting"
-  type        = bool
-  default     = false
-}
-
-variable "tags" {
-  description = "Additional tags to merge"
-  type        = map(string)
-  default     = {}
-}
-
-variable "acl" {
-  description = "Canned ACL or null"
-  type        = string
-  default     = null
-}
-
-variable "grant" {
-  description = "Either a list(map) of grants or a JSON string representing that structure"
-  type        = any
-  default     = []
-}
-
-variable "owner" {
-  description = "Optional owner map { id = canonical_id, display_name = ... }"
-  type        = map(string)
-  default     = {}
-}
-
-variable "expected_bucket_owner" {
-  description = "Account ID expected to own the bucket"
-  type        = string
-  default     = null
-}
+####Task Permissions
+Permissions for this task to call AWS service APIs depend on the activities in the supplied script.
+==============================================================================
+Configuring credentials for task
+...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
+...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
+Skipping OIDC: not enabled in service connections
+...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
+...endpoint defines standard access/secret key credentials
+Configuring region for task
+...configured to use region us-east-1, defined in task.
+/usr/bin/bash /home/vsts/work/_temp/awsshellscript_2449.sh
+Sanity: cross-project repo access (visualstudio.com)
+cd to Build.SourcesDirectory/Build.Repository.Name, then into TF working dir
+Files here:
+total 36
+drwxr-xr-x 3 vsts vsts 4096 Oct  7 18:36 .
+drwxr-xr-x 3 vsts vsts 4096 Oct  7 18:36 ..
+drwxr-xr-x 7 vsts vsts 4096 Oct  7 18:36 .git
+-rw-r--r-- 1 vsts vsts 3799 Oct  7 18:36 azure-pipeline.yml
