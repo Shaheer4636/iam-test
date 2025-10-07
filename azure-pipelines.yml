@@ -1,27 +1,28 @@
--rw-r--r-- 1 vsts vsts 3917 Oct  7 17:52 azure-pipeline.yml
--rw-r--r-- 1 vsts vsts 1371 Oct  7 17:52 dev.tfvars
--rw-r--r-- 1 vsts vsts  205 Oct  7 17:52 providers.tf
--rw-r--r-- 1 vsts vsts 2793 Oct  7 17:52 s3.tf
--rw-r--r-- 1 vsts vsts 2975 Oct  7 17:52 variables.tf
-terraform init (moduleRef=refs/tags/4.2.0)
-Initializing the backend...
-Initializing modules...
-╷
-│ Error: Unsuitable value type
-│ 
-│   on s3.tf line 10, in module "s3":
-│   10:   source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=${var.module_ref}"
-│ 
-│ Unsuitable value: value must be known
-╵
-╷
-│ Error: Variables not allowed
-│ 
-│   on s3.tf line 10, in module "s3":
-│   10:   source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=${var.module_ref}"
-│ 
-│ Variables may not be used here.
-╵
+module "s3" {
+  source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=refs/tags/4.2.0"
 
-##[error]Error: The process '/usr/bin/bash' failed with exit code 1
-Finishing: Terraform init/plan/apply (AWS creds)
+  bucket = lower(var.bucket_name)
+  versioning = { enabled = var.versioning_enabled }
+
+  attach_policy                        = true
+  force_destroy                        = var.force_destroy
+  block_public_acls                    = var.block_public_acls
+  block_public_policy                  = var.block_public_policy
+  server_side_encryption_configuration = var.server_side_encryption_configuration
+  policy                               = var.bucket_policy_json
+  ignore_public_acls                   = var.ignore_public_acls
+  lifecycle_rule                       = var.lifecycle_rule
+  restrict_public_buckets              = var.restrict_public_buckets
+  control_object_ownership             = var.control_object_ownership
+  object_ownership                     = var.object_ownership
+  object_lock_enabled                  = var.object_lock_enabled
+  object_lock_configuration            = var.object_lock_configuration
+
+  tags = merge(
+    {
+      Name                       = lower(var.bucket_name)
+      continuous_backups_enabled = tostring(var.continuous_backups_enabled)
+    },
+    var.tags
+  )
+}
