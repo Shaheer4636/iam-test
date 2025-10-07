@@ -1,76 +1,49 @@
-data "aws_canonical_user_id" "this" {}
+# azure-pipelines.yml
+trigger: none
 
-locals {
-  grants            = try(jsondecode(var.grant), var.grant)
-  lower_bucket_name = lower(var.bucket_name)
-}
+pool:
+  vmImage: ubuntu-latest
 
-module "s3" {
-  # Hard-coded ref (Terraform forbids variables in module.source)
-  source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=refs/tags/4.2.0"
+variables:
+  TF_VERSION: '1.7.5'
+  ADO_ORG: 'samcado'
+  ADO_PROJECT: 'DEVOPS_Platform_as_a_Service'
+  MODULE_TAG: 'refs/tags/4.2.0'
+  MODULE_PATH: 'terraform-3.1.0-s3-bucket'
+  MODULE_URL: 'git::https://$(ADO_ORG).visualstudio.com/$(ADO_PROJECT)/_git/s3//$(MODULE_PATH)?ref=$(MODULE_TAG)'
 
-  bucket = local.lower_bucket_name
+steps:
+  - checkout: self
 
-  versioning = {
-    enabled = var.versioning_enabled
-  }
+  - script: |
+      set -eux
+      umask 077
+      cat > ~/.netrc << 'EOF'
+      machine $(ADO_ORG).visualstudio.com
+        login AzureDevOps
+        password $(S3_PAT)
+      machine dev.azure.com
+        login AzureDevOps
+        password $(S3_PAT)
+      EOF
 
-  attach_policy                        = true
-  force_destroy                        = var.force_destroy
-  block_public_acls                    = var.block_public_acls
-  block_public_policy                  = var.block_public_policy
-  server_side_encryption_configuration = var.server_side_encryption_configuration
-  policy                               = var.bucket_policy_json
-  ignore_public_acls                   = var.ignore_public_acls
-  lifecycle_rule                       = var.lifecycle_rule
-  restrict_public_buckets              = var.restrict_public_buckets
-  control_object_ownership             = var.control_object_ownership
-  object_ownership                     = var.object_ownership
-  object_lock_enabled                  = var.object_lock_enabled
-  object_lock_configuration            = var.object_lock_configuration
+      git config --global credential.helper store
+    displayName: "Seed ~/.netrc with PAT for Git HTTPS"
+    env:
+      S3_PAT: $(S3_PAT)   # secret var
 
-  # tags is map(string); cast boolean
-  tags = merge(
-    {
-      Name                       = local.lower_bucket_name
-      continuous_backups_enabled = tostring(var.continuous_backups_enabled)
-    },
-    var.tags
-  )
-}
+  - script: |
+      set -eux
+      curl -sSLo tf.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
+      sudo unzip -o tf.zip -d /usr/local/bin
+      terraform -version
+    displayName: "Install Terraform"
 
-resource "aws_s3_bucket_acl" "this" {
-  depends_on = [module.s3]
-
-  # Keep ACL only when ownership isn't enforced AND (acl set OR grants provided)
-  count = var.object_ownership == "BucketOwnerEnforced"
-    ? 0
-    : ((((var.acl != null) && (var.acl != "null") && (var.acl != "")) || (length(local.grants) > 0)) ? 1 : 0)
-
-  bucket                = module.s3.s3_bucket_id
-  expected_bucket_owner = var.expected_bucket_owner
-
-  acl = var.acl != null ? var.acl : null
-
-  dynamic "access_control_policy" {
-    for_each = length(local.grants) > 0 ? [true] : []
-    content {
-      dynamic "grant" {
-        for_each = local.grants
-        content {
-          permission = grant.value.permission
-          grantee {
-            type          = grant.value.type
-            id            = try(grant.value.id, null)
-            uri           = try(grant.value.uri, null)
-            email_address = try(grant.value.email, null)
-          }
-        }
-      }
-      owner {
-        id           = try(var.owner["id"], data.aws_canonical_user_id.this.id)
-        display_name = try(var.owner["display_name"], null)
-      }
-    }
-  }
-}
+  - script: |
+      set -eux
+      terraform init -input=false
+      terraform validate
+      terraform plan -input=false -var-file="dev.tfvars"
+    env:
+      TF_LOG: WARN
+    displayName: "Terraform init/plan (module via Git URL + PAT)"
