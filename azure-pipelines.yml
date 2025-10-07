@@ -1,49 +1,44 @@
-# azure-pipelines.yml
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/7.7.0
+    - repository: vpc
+      type: git
+      name: DEVOPS_Platform_as_a_Service/vpc
+      ref: refs/tags/4.2.0
+    - repository: security-groups
+      type: git
+      name: DEVOPS_Platform_as_a_Service/security-groups
+      ref: refs/tags/2.40.0
+    - repository: iam-controls
+      type: git
+      name: DEVOPS_Platform_as_a_Service/iam-controls
+      ref: refs/tags/3.0.0
+
 trigger: none
 
-pool:
-  vmImage: ubuntu-latest
+parameters:
+- name: sandbox
+  displayName: Deploy QuickSetup vpc SAMC env to SAMC 
+  type: boolean
+  default: false
+- name: terrformPLANonly
+  displayName: tfPlanOnly (check == true)
+  type: boolean
+  default: false
 
-variables:
-  TF_VERSION: '1.7.5'
-  ADO_ORG: 'samcado'
-  ADO_PROJECT: 'DEVOPS_Platform_as_a_Service'
-  MODULE_TAG: 'refs/tags/4.2.0'
-  MODULE_PATH: 'terraform-3.1.0-s3-bucket'
-  MODULE_URL: 'git::https://$(ADO_ORG).visualstudio.com/$(ADO_PROJECT)/_git/s3//$(MODULE_PATH)?ref=$(MODULE_TAG)'
-
-steps:
-  - checkout: self
-
-  - script: |
-      set -eux
-      umask 077
-      cat > ~/.netrc << 'EOF'
-      machine $(ADO_ORG).visualstudio.com
-        login AzureDevOps
-        password $(S3_PAT)
-      machine dev.azure.com
-        login AzureDevOps
-        password $(S3_PAT)
-      EOF
-
-      git config --global credential.helper store
-    displayName: "Seed ~/.netrc with PAT for Git HTTPS"
-    env:
-      S3_PAT: $(S3_PAT)   # secret var
-
-  - script: |
-      set -eux
-      curl -sSLo tf.zip https://releases.hashicorp.com/terraform/$(TF_VERSION)/terraform_$(TF_VERSION)_linux_amd64.zip
-      sudo unzip -o tf.zip -d /usr/local/bin
-      terraform -version
-    displayName: "Install Terraform"
-
-  - script: |
-      set -eux
-      terraform init -input=false
-      terraform validate
-      terraform plan -input=false -var-file="dev.tfvars"
-    env:
-      TF_LOG: WARN
-    displayName: "Terraform init/plan (module via Git URL + PAT)"
+stages:
+  - template: deploy/tf-create-infra-template.yml@templates
+    parameters:
+      environment: sandbox
+      environmentDisplayName: sandbox
+      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+      tfVersion: 1.13.3
+      application: QuickSetup
+      pipelineSrcDir: $(Build.Repository.Name)
+      tfPlanOnly: ${{ parameters.terrformPLANonly }}
+      regionName: us-east-1
+      checkoutTemplate: gitCheckouts.yml
