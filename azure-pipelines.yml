@@ -1,5 +1,10 @@
-variable "module_ref" {
-  description = "ADO Git ref for the s3 module (e.g., refs/tags/4.2.0)"
-  type        = string
-  default     = "refs/tags/4.2.0"
+module "s3" {
+  # visualstudio.com host; subfolder path inside repo; ref from pipeline
+  source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=${var.module_ref}"
+
+  # your inputs here
+  bucket_name        = "client-uptime-report-obs-artifacts"
+  versioning_enabled = true
+
+  # add the rest of the inputs you use (block_public_acls, policy, tags, etc.)
 }
