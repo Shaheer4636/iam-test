@@ -1,117 +1,355 @@
-# azure-pipelines.yml  — Terraform (IAM only) with S3 backend
-trigger: none
-
-# ---------- RUN-TIME PARAMETERS ----------
 parameters:
-- name: tfPlanOnly
-  displayName: Terraform plan only (no apply)
-  type: boolean
-  default: true
-- name: regionName
-  displayName: AWS region
-  type: string
-  default: 'us-east-1'
-- name: useS3Backend
-  displayName: Use S3 backend for Terraform state
-  type: boolean
-  default: true
-- name: s3Bucket
-  displayName: S3 bucket for TF state
-  type: string
-  default: 'samc-obs-tfstate'  # <-- EDIT to your bucket
-- name: s3Key
-  displayName: S3 key (path) for TF state
-  type: string
-  default: 'iam-only/sandbox/terraform.tfstate'  # <-- EDIT if you want
-- name: dynamoTable
-  displayName: DynamoDB table for TF state lock
-  type: string
-  default: 'samc-obs-tflock'  # <-- EDIT to your table
+  - name: awsRegion
+    displayName: 'AWS Region'
+    type: string
+    default: 'us-east-1'
+    values: ['us-east-1', 'us-east-2']
+  - name: awsServiceConnection
+    displayName: 'AWS Service Connection'
+    type: string
+    default: 'DevopsSandbox-889050139813-DevopsIACSvcVpc-Infrastructure Operations'
+    values:
+      - 'DevopsSandbox-889050139813-DevopsIACSvcVpc-Infrastructure Operations'
+      - 'SAMCDev-122210853657-DEVOPSIACSVCVPC-Infrastructure Operations'
+  - name: dryRun
+    displayName: 'Dry Run'
+    type: boolean
+    default: true
+  - name: runListTask
+    displayName: 'Show existing tags'
+    type: boolean
+    default: true
+  - name: samcEnvValue
+    displayName: 'Environment (samc:env)'
+    type: string
+    default: ''
+    values: ["sandbox", "dev", "idev", "nonprod", "kdev", "qa1", "sit", "sit2", "sit3", "uat", "uat1", "prod", "none", "sbx"]
+  - name: samcAppIdValue
+    displayName: 'App ID (samc:appid)'
+    type: string
+    default: ''
+    values: ["TrainingApp", "PMEMB", "Centricity", "Sandbox", "DevOps", "Baseline", "petest", "none", "AcuityGenAIDataEx", "AcuityGenAiDEx", "AMIWatch", "DataExtract", "DevOpsADO", "MASembtrust", "zacuityz", "skip"]
+  - name: resourceType
+    displayName: 'AWS Resource Type'
+    type: string
+    default: ''
+    values: ['ec2', 's3', 'rds', 'ebs']
+  - name: tagFile
+    displayName: 'Tag File'
+    type: string
+    default: 'tags-training.list'
 
-# ---------- PIPELINE VARIABLES ----------
-variables:
-  # CHANGE THIS TO MATCH THE EXACT SERVICE CONNECTION NAME IN THIS PROJECT
-  AWS_SC_REGIONAL: 'SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations'
-
+trigger: none
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
+
+variables:
+  AWS_REGION: ${{ parameters.awsRegion }}
+  RESOURCE_TYPE: ${{ parameters.resourceType }}
 
 steps:
-- checkout: self
-
-# Install a pinned Terraform version
-- script: |
-    set -e
-    curl -sLo tf.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-    unzip -o tf.zip
-    sudo mv terraform /usr/local/bin/terraform
-    terraform -version
-  displayName: Install Terraform 1.6.6
-
-# Create backend.hcl only when using S3 backend (this is your "terra connection string")
-- ${{ if eq(parameters.useS3Backend, true) }}:
-  - script: |
-      cat > backend.hcl <<'EOF'
-      bucket         = "${{ parameters.s3Bucket }}"
-      key            = "${{ parameters.s3Key }}"
-      region         = "${{ parameters.regionName }}"
-      dynamodb_table = "${{ parameters.dynamoTable }}"
-      encrypt        = true
-      EOF
-      echo "Wrote backend.hcl:"
-      cat backend.hcl
-    displayName: Write backend.hcl (S3 state)
-
-# Plan (verbose + time-boxed)
-- task: AWSShellScript@1
-  displayName: Terraform init + plan (verbose)
-  timeoutInMinutes: 20
-  env:
-    TF_LOG: INFO
-    TF_LOG_PATH: $(Build.SourcesDirectory)/terraform.log
-    TF_PLUGIN_CACHE_DIR: $(Pipeline.Workspace)/.tfcache
-    USE_S3: ${{ parameters.useS3Backend }}
-  inputs:
-    awsCredentials: '$(AWS_SC_REGIONAL)'
-    regionName: '${{ parameters.regionName }}'
-    scriptType: 'bash'
-    inlineScript: |
-      set -euxo pipefail
-      echo "== whoami ==" && whoami
-      echo "== ls ==" && ls -la
-
-      echo "== network probes =="
-      curl -sSfI https://registry.terraform.io/v1/providers/hashicorp/aws/versions || echo "registry.terraform.io unreachable"
-      curl -sSfI https://releases.hashicorp.com/terraform-provider-aws/ || echo "releases.hashicorp.com unreachable"
-
-      echo "== terraform init =="
-      if [ "${USE_S3,,}" = "true" ]; then
-        timeout 600 terraform init -input=false -upgrade -no-color -backend-config=backend.hcl
-      else
-        timeout 600 terraform init -input=false -upgrade -no-color
-      fi
-
-      echo "== terraform validate =="
-      terraform validate -no-color
-
-      echo "== terraform plan =="
-      timeout 600 terraform plan -input=false -no-color -var-file vars/sandbox.tfvars -out tf.plan
-
-# Publish artifacts (plan + log)
-- publish: tf.plan
-  artifact: tfplan
-- publish: $(Build.SourcesDirectory)/terraform.log
-  artifact: tflog
-
-# Apply only if tfPlanOnly = false
-- ${{ if not(parameters.tfPlanOnly) }}:
+- ${{ if eq(parameters.runListTask, true) }}:
   - task: AWSShellScript@1
-    displayName: Terraform apply
-    timeoutInMinutes: 20
+    displayName: 'List AWS Resources'
     inputs:
-      awsCredentials: '$(AWS_SC_REGIONAL)'
-      regionName: '${{ parameters.regionName }}'
-      scriptType: 'bash'
+      awsCredentials: ${{ parameters.awsServiceConnection }}
+      regionName: ${{ parameters.awsRegion }}
+      scriptType: 'inline'
       inlineScript: |
-        set -euxo pipefail
-        terraform apply -input=false -auto-approve tf.plan
+        echo "Listing $(RESOURCE_TYPE) resources in $(AWS_REGION)"
+        TF="${{ parameters.tagFile }}"
+        [ -f "$TF" ] && { echo "--- Tags from $TF ---"; grep -v '^#\|^$' "$TF" | while IFS='=' read k v; do echo "Key: $k | Value: $v"; done; echo "---"; }
+        case "$(RESOURCE_TYPE)" in
+          ec2) aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --output text | while read id; do echo "Instance: $id"; aws ec2 describe-tags --filters "Name=resource-id,Values=$id" --query 'Tags[*].[Key,Value]' --output table || echo "No tags"; done ;;
+          s3) aws s3api list-buckets --query 'Buckets[*].Name' --output text | while read b; do echo "Bucket: $b"; aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet' --output table 2>/dev/null || echo "No tags"; done ;;
+          rds) aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,DBInstanceArn]' --output text | while read db arn; do echo "DB: $db"; aws rds list-tags-for-resource --resource-name "$arn" --query 'TagList[*].[Key,Value]' --output table 2>/dev/null || echo "No tags"; done ;;
+          ebs) aws ec2 describe-volumes --query 'Volumes[*].VolumeId' --output text | while read v; do echo "Volume: $v"; aws ec2 describe-tags --filters "Name=resource-id,Values=$v" --query 'Tags[*].[Key,Value]' --output table || echo "No tags"; done ;;
+        esac
+
+- task: AWSShellScript@1
+  displayName: 'Update AWS Resource Tags'
+  inputs:
+    awsCredentials: ${{ parameters.awsServiceConnection }}
+    regionName: ${{ parameters.awsRegion }}
+    scriptType: 'inline'
+    inlineScript: |
+      echo "Updating $(RESOURCE_TYPE) tags, dry-run: ${{ parameters.dryRun }}"
+      TF="${{ parameters.tagFile }}"
+      [ ! -f "$TF" ] && { echo "ERROR: $TF not found"; exit 252; }
+      
+      TAGS=(); while IFS= read -r line || [ -n "$line" ]; do [[ -z "$line" || "$line" =~ ^# ]] && continue; TAGS+=("$line"); done < "$TF"
+      
+      build_args() { local a=""; for t in "${TAGS[@]}"; do a+=" Key=${t%%=*},Value=${t#*=}"; done; echo "$a"; }
+      build_json() { printf '['; local f=1; for t in "${TAGS[@]}"; do [ $f -eq 0 ] && printf ','; printf '{"Key":"%s","Value":"%s"}' "${t%%=*}" "${t#*=}"; f=0; done; printf ']'; }
+      is_dry() { [[ "$(echo '${{ parameters.dryRun }}' | tr '[:upper:]' '[:lower:]')" = "true" ]]; }
+      
+      case "$(RESOURCE_TYPE)" in
+        ec2)
+          for id in $(aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceId' --output text); do
+            tc=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$id" --query 'length(Tags)' --output text); tc=${tc:-0}
+            env=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$id" "Name=key,Values=samc:env" --query 'Tags[0].Value' --output text)
+            app=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$id" "Name=key,Values=samc:appid" --query 'Tags[0].Value' --output text)
+            
+            if [ "$tc" -eq 0 ]; then
+              echo "No tags for EC2 $id, adding defaults"
+              if is_dry; then echo "Would add defaults to $id"; else aws ec2 create-tags --resources "$id" --tags Key=samc:env,Value=none Key=samc:appid,Value=none; echo "Added defaults to $id"; fi
+              continue
+            fi
+            
+            if ([[ "$env" = "None" ]] || [[ -z "$env" ]]) && [[ -n "${{ parameters.samcEnvValue }}" ]]; then
+              if is_dry; then echo "Would set samc:env=${{ parameters.samcEnvValue }} on $id"; env="${{ parameters.samcEnvValue }}"; else aws ec2 create-tags --resources "$id" --tags Key=samc:env,Value=${{ parameters.samcEnvValue }}; echo "Set samc:env=${{ parameters.samcEnvValue }} on $id"; env="${{ parameters.samcEnvValue }}"; fi
+            elif [[ "$env" = "None" ]] || [[ -z "$env" ]]; then echo "Skipping $id (no samc:env)"; continue; fi
+            
+            # Only set samc:appid if explicitly provided and resource doesn't have one
+            if ([[ "$app" = "None" ]] || [[ -z "$app" ]]) && [[ -n "${{ parameters.samcAppIdValue }}" ]]; then
+              if is_dry; then echo "Would set samc:appid=${{ parameters.samcAppIdValue }} on $id"; app="${{ parameters.samcAppIdValue }}"; else aws ec2 create-tags --resources "$id" --tags Key=samc:appid,Value=${{ parameters.samcAppIdValue }}; echo "Set samc:appid=${{ parameters.samcAppIdValue }} on $id"; app="${{ parameters.samcAppIdValue }}"; fi
+            fi
+            
+            # Filter by environment - this is the primary filter
+            [[ -n "${{ parameters.samcEnvValue }}" && "$env" != "${{ parameters.samcEnvValue }}" ]] && { echo "Skipping $id (env mismatch: existing='$env', desired='${{ parameters.samcEnvValue }}')"; continue; }
+            
+            # Only filter by appid if both parameter is provided AND resource has an appid AND parameter is not "skip"
+            if [[ -n "${{ parameters.samcAppIdValue }}" ]] && [[ "${{ parameters.samcAppIdValue }}" != "skip" ]] && [[ -n "$app" ]] && [[ "$app" != "None" ]]; then
+              [[ "$app" != "${{ parameters.samcAppIdValue }}" ]] && { echo "Skipping $id (app mismatch: existing='$app', desired='${{ parameters.samcAppIdValue }}')"; continue; }
+            fi
+            
+            # Check if tags need updating (only add missing tags, never overwrite)
+            et=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$id" --query 'Tags[*].{Key:Key,Value:Value}' --output json)
+            ct=$(build_json)
+            
+            # Find tags that are missing (don't exist on the resource)
+            missing_tags=$(echo "$ct" | jq --argjson existing "$et" '[.[] | select(.Key as $key | $existing | map(.Key) | index($key) == null)]')
+            
+            if echo "$missing_tags" | jq -e '. == []' >/dev/null 2>&1; then
+              echo "No missing tags for $id - all desired tags already exist"
+              needs_update=false
+            else
+              echo "Missing tags for $id:"
+              echo "$missing_tags" | jq -r '.[] | "  \(.Key)=\(.Value)"'
+              needs_update=true
+            fi
+            
+            if is_dry; then 
+              if [[ "$needs_update" == "true" ]]; then
+                echo "Would add missing tags to $id:"
+                echo "$missing_tags" | jq -r '.[] | "  Key=" + .Key + ",Value=" + .Value' | tr '\n' ' '
+                echo ""
+              else
+                echo "No changes needed for $id - all tags already exist"
+              fi
+            else
+              if [[ "$needs_update" == "true" ]]; then
+                # Only add the missing tags, preserve all existing tags
+                ta=$(echo "$missing_tags" | jq -r '.[] | "Key=" + .Key + ",Value=" + .Value' | tr '\n' ' ')
+                aws ec2 create-tags --resources "$id" --tags $ta
+                echo "Added missing tags to $id"; aws ec2 describe-tags --filters "Name=resource-id,Values=$id" --query 'Tags[*].[Key,Value]' --output table
+              else
+                echo "No changes needed for $id - all tags already exist"
+              fi
+            fi
+          done ;;
+        s3)
+          for b in $(aws s3api list-buckets --query 'Buckets[*].Name' --output text); do
+            tc=$(aws s3api get-bucket-tagging --bucket "$b" --query 'length(TagSet)' --output text 2>/dev/null); tc=${tc:-0}
+            env=$(aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet[?Key==`samc:env`].Value' --output text 2>/dev/null)
+            app=$(aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet[?Key==`samc:appid`].Value' --output text 2>/dev/null)
+            
+            if [ "$tc" -eq 0 ]; then
+              echo "No tags for S3 $b, adding defaults"
+              if is_dry; then echo "Would add defaults to $b"; else aws s3api put-bucket-tagging --bucket "$b" --tagging '{"TagSet":[{"Key":"samc:env","Value":"none"},{"Key":"samc:appid","Value":"none"}]}'; echo "Added defaults to $b"; fi
+              continue
+            fi
+            
+            if [[ -z "$env" ]] && [[ -n "${{ parameters.samcEnvValue }}" ]]; then
+              if is_dry; then echo "Would set samc:env=${{ parameters.samcEnvValue }} on $b"; env="${{ parameters.samcEnvValue }}"; else aws s3api put-bucket-tagging --bucket "$b" --tagging "{\"TagSet\":[{\"Key\":\"samc:env\",\"Value\":\"${{ parameters.samcEnvValue }}\"}]}"; echo "Set samc:env=${{ parameters.samcEnvValue }} on $b"; env="${{ parameters.samcEnvValue }}"; fi
+            elif [[ -z "$env" ]]; then echo "Skipping $b (no samc:env)"; continue; fi
+            
+            # Only set samc:appid if explicitly provided and resource doesn't have one
+            if [[ -z "$app" ]] && [[ -n "${{ parameters.samcAppIdValue }}" ]]; then
+              if is_dry; then echo "Would set samc:appid=${{ parameters.samcAppIdValue }} on $b"; app="${{ parameters.samcAppIdValue }}"; else aws s3api put-bucket-tagging --bucket "$b" --tagging "{\"TagSet\":[{\"Key\":\"samc:appid\",\"Value\":\"${{ parameters.samcAppIdValue }}\"}]}"; echo "Set samc:appid=${{ parameters.samcAppIdValue }} on $b"; app="${{ parameters.samcAppIdValue }}"; fi
+            fi
+            
+            # Filter by environment - this is the primary filter
+            [[ -n "${{ parameters.samcEnvValue }}" && "$env" != "${{ parameters.samcEnvValue }}" ]] && { echo "Skipping $b (env mismatch: existing='$env', desired='${{ parameters.samcEnvValue }}')"; continue; }
+            
+            # Only filter by appid if both parameter is provided AND resource has an appid AND parameter is not "skip"
+            if [[ -n "${{ parameters.samcAppIdValue }}" ]] && [[ "${{ parameters.samcAppIdValue }}" != "skip" ]] && [[ -n "$app" ]] && [[ "$app" != "None" ]]; then
+              [[ "$app" != "${{ parameters.samcAppIdValue }}" ]] && { echo "Skipping $b (app mismatch: existing='$app', desired='${{ parameters.samcAppIdValue }}')"; continue; }
+            fi
+            
+            # Check if tags need updating (only add missing tags, never overwrite)
+            et=$(aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet' --output json 2>/dev/null || echo '[]')
+            ct=$(build_json)
+            
+            # Filter out system tags for comparison
+            filtered_existing=$(echo "$et" | jq '[.[] | select(.Key | test("^(aws:|cloudformation:|s3:)") | not)]')
+            
+            # Find tags that are missing (don't exist on the resource)
+            missing_tags=$(echo "$ct" | jq --argjson existing "$filtered_existing" '[.[] | select(.Key as $key | $existing | map(.Key) | index($key) == null)]')
+            
+            if echo "$missing_tags" | jq -e '. == []' >/dev/null 2>&1; then
+              echo "No missing tags for $b - all desired tags already exist"
+              needs_update=false
+            else
+              echo "Missing tags for $b:"
+              echo "$missing_tags" | jq -r '.[] | "  \(.Key)=\(.Value)"'
+              needs_update=true
+            fi
+            
+            if is_dry; then 
+              if [[ "$needs_update" == "true" ]]; then
+                echo "Would add missing tags to $b:"
+                echo "$missing_tags" | jq -r '.[] | "  Key=" + .Key + ",Value=" + .Value' | tr '\n' ' '
+                echo ""
+              else
+                echo "No changes needed for $b - all tags already exist"
+              fi
+            else
+              if [[ "$needs_update" == "true" ]]; then
+                # Get original tags to preserve system tags
+                original_tags=$(aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet' --output json 2>/dev/null || echo '[]')
+                system_tags=$(echo "$original_tags" | jq '[.[] | select(.Key | test("^(aws:|cloudformation:)"))]')
+                # Merge system tags with existing custom tags and missing tags
+                final_tags=$(echo "$system_tags" "$filtered_existing" "$missing_tags" | jq -s 'add | unique_by(.Key)')
+                if ! aws s3api put-bucket-tagging --bucket "$b" --tagging "{\"TagSet\":$final_tags}" 2>/dev/null; then
+                  echo "WARNING: Could not update tags for S3 bucket $b (may contain system-managed tags)"
+                  # Try with only custom tags, excluding any that might conflict
+                  custom_only=$(echo "$filtered_existing" "$missing_tags" | jq -s 'add | unique_by(.Key)')
+                  aws s3api put-bucket-tagging --bucket "$b" --tagging "{\"TagSet\":$custom_only}" 2>/dev/null || echo "ERROR: Failed to tag S3 bucket $b"
+                fi
+                echo "Added missing tags to $b"; aws s3api get-bucket-tagging --bucket "$b" --query 'TagSet' --output table 2>/dev/null || echo "No tags"
+              else
+                echo "No changes needed for $b - all tags already exist"
+              fi
+            fi
+          done ;;
+        rds)
+          for db in $(aws rds describe-db-instances --query 'DBInstances[*].DBInstanceIdentifier' --output text); do
+            arn=$(aws rds describe-db-instances --db-instance-identifier "$db" --query 'DBInstances[0].DBInstanceArn' --output text)
+            tc=$(aws rds list-tags-for-resource --resource-name "$arn" --query 'length(TagList)' --output text 2>/dev/null); tc=${tc:-0}
+            env=$(aws rds list-tags-for-resource --resource-name "$arn" --query 'TagList[?Key==`samc:env`].Value' --output text 2>/dev/null)
+            app=$(aws rds list-tags-for-resource --resource-name "$arn" --query 'TagList[?Key==`samc:appid`].Value' --output text 2>/dev/null)
+            
+            if [ "$tc" -eq 0 ]; then
+              echo "No tags for RDS $db, adding defaults"
+              if is_dry; then echo "Would add defaults to $db"; else aws rds add-tags-to-resource --resource-name "$arn" --tags Key=samc:env,Value=none Key=samc:appid,Value=none; echo "Added defaults to $db"; fi
+              continue
+            fi
+            
+            if [[ -z "$env" ]] && [[ -n "${{ parameters.samcEnvValue }}" ]]; then
+              if is_dry; then echo "Would set samc:env=${{ parameters.samcEnvValue }} on $db"; env="${{ parameters.samcEnvValue }}"; else aws rds add-tags-to-resource --resource-name "$arn" --tags Key=samc:env,Value=${{ parameters.samcEnvValue }}; echo "Set samc:env=${{ parameters.samcEnvValue }} on $db"; env="${{ parameters.samcEnvValue }}"; fi
+            elif [[ -z "$env" ]]; then echo "Skipping $db (no samc:env)"; continue; fi
+            
+            # Only set samc:appid if explicitly provided and resource doesn't have one
+            if [[ -z "$app" ]] && [[ -n "${{ parameters.samcAppIdValue }}" ]]; then
+              if is_dry; then echo "Would set samc:appid=${{ parameters.samcAppIdValue }} on $db"; app="${{ parameters.samcAppIdValue }}"; else aws rds add-tags-to-resource --resource-name "$arn" --tags Key=samc:appid,Value=${{ parameters.samcAppIdValue }}; echo "Set samc:appid=${{ parameters.samcAppIdValue }} on $db"; app="${{ parameters.samcAppIdValue }}"; fi
+            fi
+            
+            # Filter by environment - this is the primary filter
+            [[ -n "${{ parameters.samcEnvValue }}" && "$env" != "${{ parameters.samcEnvValue }}" ]] && { echo "Skipping $db (env mismatch: existing='$env', desired='${{ parameters.samcEnvValue }}')"; continue; }
+            
+            # Only filter by appid if both parameter is provided AND resource has an appid AND parameter is not "skip"
+            if [[ -n "${{ parameters.samcAppIdValue }}" ]] && [[ "${{ parameters.samcAppIdValue }}" != "skip" ]] && [[ -n "$app" ]] && [[ "$app" != "None" ]]; then
+              [[ "$app" != "${{ parameters.samcAppIdValue }}" ]] && { echo "Skipping $db (app mismatch: existing='$app', desired='${{ parameters.samcAppIdValue }}')"; continue; }
+            fi
+            
+            # Check if tags need updating (only add missing tags, never overwrite)
+            et=$(aws rds list-tags-for-resource --resource-name "$arn" --query 'TagList[*].{Key:Key,Value:Value}' --output json 2>/dev/null)
+            ct=$(build_json)
+            
+            # Find tags that are missing (don't exist on the resource)
+            missing_tags=$(echo "$ct" | jq --argjson existing "$et" '[.[] | select(.Key as $key | $existing | map(.Key) | index($key) == null)]')
+            
+            if echo "$missing_tags" | jq -e '. == []' >/dev/null 2>&1; then
+              echo "No missing tags for $db - all desired tags already exist"
+              needs_update=false
+            else
+              echo "Missing tags for $db:"
+              echo "$missing_tags" | jq -r '.[] | "  \(.Key)=\(.Value)"'
+              needs_update=true
+            fi
+            
+            if is_dry; then 
+              if [[ "$needs_update" == "true" ]]; then
+                echo "Would add missing tags to $db:"
+                echo "$missing_tags" | jq -r '.[] | "  Key=" + .Key + ",Value=" + .Value' | tr '\n' ' '
+                echo ""
+              else
+                echo "No changes needed for $db - all tags already exist"
+              fi
+            else
+              if [[ "$needs_update" == "true" ]]; then
+                # Only add the missing tags, preserve all existing tags
+                ta=$(echo "$missing_tags" | jq -r '.[] | "Key=" + .Key + ",Value=" + .Value' | tr '\n' ' ')
+                [ -n "$ta" ] && aws rds add-tags-to-resource --resource-name "$arn" --tags $ta
+                echo "Added missing tags to $db"; aws rds list-tags-for-resource --resource-name "$arn" --query 'TagList[*].[Key,Value]' --output table 2>/dev/null || echo "No tags"
+              else
+                echo "No changes needed for $db - all tags already exist"
+              fi
+            fi
+          done ;;
+        ebs)
+          for v in $(aws ec2 describe-volumes --query 'Volumes[*].VolumeId' --output text); do
+            tc=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$v" --query 'length(Tags)' --output text); tc=${tc:-0}
+            env=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$v" "Name=key,Values=samc:env" --query 'Tags[0].Value' --output text)
+            app=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$v" "Name=key,Values=samc:appid" --query 'Tags[0].Value' --output text)
+            
+            if [ "$tc" -eq 0 ]; then
+              echo "No tags for EBS $v, adding defaults"
+              if is_dry; then echo "Would add defaults to $v"; else aws ec2 create-tags --resources "$v" --tags Key=samc:env,Value=none Key=samc:appid,Value=none; echo "Added defaults to $v"; fi
+              continue
+            fi
+            
+            if ([[ "$env" = "None" ]] || [[ -z "$env" ]]) && [[ -n "${{ parameters.samcEnvValue }}" ]]; then
+              if is_dry; then echo "Would set samc:env=${{ parameters.samcEnvValue }} on $v"; env="${{ parameters.samcEnvValue }}"; else aws ec2 create-tags --resources "$v" --tags Key=samc:env,Value=${{ parameters.samcEnvValue }}; echo "Set samc:env=${{ parameters.samcEnvValue }} on $v"; env="${{ parameters.samcEnvValue }}"; fi
+            elif [[ "$env" = "None" ]] || [[ -z "$env" ]]; then echo "Skipping $v (no samc:env)"; continue; fi
+            
+            # Only set samc:appid if explicitly provided and resource doesn't have one
+            if ([[ "$app" = "None" ]] || [[ -z "$app" ]]) && [[ -n "${{ parameters.samcAppIdValue }}" ]]; then
+              if is_dry; then echo "Would set samc:appid=${{ parameters.samcAppIdValue }} on $v"; app="${{ parameters.samcAppIdValue }}"; else aws ec2 create-tags --resources "$v" --tags Key=samc:appid,Value=${{ parameters.samcAppIdValue }}; echo "Set samc:appid=${{ parameters.samcAppIdValue }} on $v"; app="${{ parameters.samcAppIdValue }}"; fi
+            fi
+            
+            # Filter by environment - this is the primary filter
+            [[ -n "${{ parameters.samcEnvValue }}" && "$env" != "${{ parameters.samcEnvValue }}" ]] && { echo "Skipping $v (env mismatch: existing='$env', desired='${{ parameters.samcEnvValue }}')"; continue; }
+            
+            # Only filter by appid if both parameter is provided AND resource has an appid AND parameter is not "skip"
+            if [[ -n "${{ parameters.samcAppIdValue }}" ]] && [[ "${{ parameters.samcAppIdValue }}" != "skip" ]] && [[ -n "$app" ]] && [[ "$app" != "None" ]]; then
+              [[ "$app" != "${{ parameters.samcAppIdValue }}" ]] && { echo "Skipping $v (app mismatch: existing='$app', desired='${{ parameters.samcAppIdValue }}')"; continue; }
+            fi
+            
+            # Check if tags need updating (only add missing tags, never overwrite)
+            et=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$v" --query 'Tags[*].{Key:Key,Value:Value}' --output json)
+            ct=$(build_json)
+            
+            # Find tags that are missing (don't exist on the resource)
+            missing_tags=$(echo "$ct" | jq --argjson existing "$et" '[.[] | select(.Key as $key | $existing | map(.Key) | index($key) == null)]')
+            
+            if echo "$missing_tags" | jq -e '. == []' >/dev/null 2>&1; then
+              echo "No missing tags for $v - all desired tags already exist"
+              needs_update=false
+            else
+              echo "Missing tags for $v:"
+              echo "$missing_tags" | jq -r '.[] | "  \(.Key)=\(.Value)"'
+              needs_update=true
+            fi
+            
+            if is_dry; then 
+              if [[ "$needs_update" == "true" ]]; then
+                echo "Would add missing tags to $v:"
+                echo "$missing_tags" | jq -r '.[] | "  Key=" + .Key + ",Value=" + .Value' | tr '\n' ' '
+                echo ""
+              else
+                echo "No changes needed for $v - all tags already exist"
+              fi
+            else
+              if [[ "$needs_update" == "true" ]]; then
+                # Only add the missing tags, preserve all existing tags
+                ta=$(echo "$missing_tags" | jq -r '.[] | "Key=" + .Key + ",Value=" + .Value' | tr '\n' ' ')
+                aws ec2 create-tags --resources "$v" --tags $ta
+                echo "Added missing tags to $v"; aws ec2 describe-tags --filters "Name=resource-id,Values=$v" --query 'Tags[*].[Key,Value]' --output table || echo "No tags"
+              else
+                echo "No changes needed for $v - all tags already exist"
+              fi
+            fi
+          done ;;
+      esac
