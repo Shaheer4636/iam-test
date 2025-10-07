@@ -1,10 +1,10 @@
-# azure-pipeline.yml
+# azure-pipelines.yml
 trigger: none
 
 parameters:
 - name: awsServiceConnection
   type: string
-  default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
+  default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"  # name with spaces is OK when quoted
 
 - name: awsRegion
   type: string
@@ -23,7 +23,7 @@ parameters:
 
 - name: tfWorkingDir
   type: string
-  default: "auto"   # auto-discover folder with *.tf
+  default: "auto"   # "auto" = auto-discover folder containing *.tf
 
 pool:
   vmImage: ubuntu-latest
@@ -56,10 +56,20 @@ stages:
         scriptType: inline
         inlineScript: |
           set -euo pipefail
+
+          # Normalize booleans to lowercase strings for safe bash comparisons
+          TF_PLAN_ONLY_STR="$(printf '%s' "${TF_PLAN_ONLY:-}" | tr '[:upper:]' '[:lower:]')"
+
           export TF_IN_AUTOMATION=1
           export GIT_TERMINAL_PROMPT=0
 
-          # Auth for ADO Git (PAT via ~/.netrc), needed to fetch the module
+          # Predefined ADO variables are exposed as environment variables (UPPERCASE with underscores)
+          ROOT="$BUILD_SOURCESDIRECTORY"
+          REPO="$BUILD_REPOSITORY_NAME"
+          if [ -d "$ROOT/$REPO" ]; then ROOT="$ROOT/$REPO"; fi
+          echo "ROOT = $ROOT"
+
+          # Auth for fetching private modules from Azure Repos (optional)
           if [ -n "${ADO_PAT:-}" ]; then
             umask 077
             cat > ~/.netrc <<EOF
@@ -72,14 +82,9 @@ machine dev.azure.com
 EOF
           fi
 
-          # Locate the repo root (some orgs nest under $(Build.Repository.Name))
-          BASE="$(Build.SourcesDirectory)"
-          REPO="$(Build.Repository.Name)"
-          if [ -d "$BASE/$REPO" ]; then ROOT="$BASE/$REPO"; else ROOT="$BASE"; fi
-          echo "ROOT = $ROOT"
-
-          # Resolve Terraform working dir
-          if [ "${TF_WORKING_DIR}" = "auto" ]; then
+          # Resolve Terraform working directory
+          if [ "${TF_WORKING_DIR:-auto}" = "auto" ]; then
+            # Find the first directory containing any *.tf files (depth-limited)
             TF_DIR="$(find "$ROOT" -maxdepth 4 -type f -name '*.tf' -printf '%h\n' | sort -u | head -n 1 || true)"
             if [ -z "$TF_DIR" ]; then
               echo "ERROR: No Terraform files (*.tf) found under $ROOT"
@@ -87,12 +92,16 @@ EOF
             fi
           else
             TF_DIR="$ROOT/${TF_WORKING_DIR}"
+            if [ ! -d "$TF_DIR" ]; then
+              echo "ERROR: TF working dir does not exist: $TF_DIR"
+              exit 52
+            fi
           fi
 
           echo "Using TF dir: $TF_DIR"
           ls -la "$TF_DIR"
 
-          # Ensure backend.hcl exists (your requested bucket)
+          # Ensure backend.hcl exists (edit if you need different bucket/key/region)
           if [ ! -f "$TF_DIR/backend.hcl" ]; then
             cat > "$TF_DIR/backend.hcl" <<'HCL'
 bucket = "testdemobackend03096174636"
@@ -117,7 +126,8 @@ HCL
             terraform plan -input=false
           fi
 
-          if [ "${TF_PLAN_ONLY}" = "false" ]; then
+          if [ "$TF_PLAN_ONLY_STR" = "false" ]; then
+            echo "Apply enabled"
             if [ -f "dev.tfvars" ]; then
               terraform apply -input=false -auto-approve -var-file="dev.tfvars"
             else
@@ -125,6 +135,11 @@ HCL
             fi
           else
             echo "Plan-only mode: skipping apply."
+          fi
+
+          # Clean up netrc if we created it
+          if [ -n "${ADO_PAT:-}" ] && [ -f ~/.netrc ]; then
+            shred -u ~/.netrc || rm -f ~/.netrc
           fi
       env:
         ADO_PAT: ${{ parameters.adoPat }}
