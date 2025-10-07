@@ -1,7 +1,16 @@
-# azure-pipelines.yml (Bash-only variant)
+# azure-pipelines.yml
 trigger: none
 
 parameters:
+- name: awsServiceConnection
+  type: string
+  default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
+- name: awsRegion
+  type: string
+  default: "us-east-1"
+  values:
+  - "us-east-1"
+  - "us-east-2"
 - name: tfPlanOnly
   type: boolean
   default: true
@@ -17,12 +26,15 @@ pool:
 
 stages:
 - stage: s3
+  displayName: Deploy S3 (S3 backend)
   jobs:
   - job: terraform
+    displayName: Terraform init/plan/apply
     steps:
     - checkout: self
+
     - script: |
-        set -euo pipefail
+        set -e
         sudo apt-get update -y
         sudo apt-get install -y unzip jq
         TFV="1.12.2"
@@ -31,19 +43,30 @@ stages:
         terraform -version
         jq --version
       displayName: Install Terraform
-    - bash: |
-        set -euo pipefail
-        TF_PLAN_ONLY_STR="$(printf '%s' "${TF_PLAN_ONLY:-}" | tr '[:upper:]' '[:lower:]')"
-        export TF_IN_AUTOMATION=1
-        export GIT_TERMINAL_PROMPT=0
 
-        ROOT="$BUILD_SOURCESDIRECTORY"
-        REPO="$BUILD_REPOSITORY_NAME"
-        if [ -d "$ROOT/$REPO" ]; then ROOT="$ROOT/$REPO"; fi
+    - task: AWSShellScript@1
+      displayName: Terraform init/plan/apply (AWS creds)
+      inputs:
+        awsCredentials: ${{ parameters.awsServiceConnection }}
+        regionName: ${{ parameters.awsRegion }}
+        scriptType: inline
+        inlineScript: |
+          set -euo pipefail
 
-        if [ -n "${ADO_PAT:-}" ]; then
-          umask 077
-          cat > ~/.netrc <<EOF
+          # normalize boolean to 'true'/'false'
+          TF_PLAN_ONLY_STR="$(printf '%s' "${TF_PLAN_ONLY:-}" | tr '[:upper:]' '[:lower:]')"
+          export TF_IN_AUTOMATION=1
+          export GIT_TERMINAL_PROMPT=0
+
+          ROOT="$BUILD_SOURCESDIRECTORY"
+          REPO="$BUILD_REPOSITORY_NAME"
+          if [ -d "$ROOT/$REPO" ]; then ROOT="$ROOT/$REPO"; fi
+          echo "ROOT = $ROOT"
+
+          # optional PAT for fetching private TF modules from Azure Repos
+          if [ -n "${ADO_PAT:-}" ]; then
+            umask 077
+            cat > ~/.netrc <<EOF
 machine samcado.visualstudio.com
   login pat
   password ${ADO_PAT}
@@ -51,40 +74,65 @@ machine dev.azure.com
   login pat
   password ${ADO_PAT}
 EOF
-        fi
-
-        if [ "${TF_WORKING_DIR:-auto}" = "auto" ]; then
-          TF_DIR="$(find "$ROOT" -maxdepth 4 -type f -name '*.tf' -printf '%h\n' | sort -u | head -n 1 || true)"
-          if [ -z "$TF_DIR" ]; then
-            echo "ERROR: No Terraform files (*.tf) found under $ROOT"
-            exit 51
           fi
-        else
-          TF_DIR="$ROOT/${TF_WORKING_DIR}"
-          [ -d "$TF_DIR" ] || { echo "ERROR: $TF_DIR not found"; exit 52; }
-        fi
 
-        [ -f "$TF_DIR/backend.hcl" ] || cat > "$TF_DIR/backend.hcl" <<'HCL'
+          # resolve TF working dir
+          if [ "${TF_WORKING_DIR:-auto}" = "auto" ]; then
+            TF_DIR="$(find "$ROOT" -maxdepth 4 -type f -name '*.tf' -printf '%h\n' | sort -u | head -n 1 || true)"
+            if [ -z "$TF_DIR" ]; then
+              echo "ERROR: No Terraform files (*.tf) found under $ROOT"
+              exit 51
+            fi
+          else
+            TF_DIR="$ROOT/${TF_WORKING_DIR}"
+            if [ ! -d "$TF_DIR" ]; then
+              echo "ERROR: TF working dir does not exist: $TF_DIR"
+              exit 52
+            fi
+          fi
+
+          echo "Using TF dir: $TF_DIR"
+          ls -la "$TF_DIR"
+
+          # create backend.hcl if missing
+          if [ ! -f "$TF_DIR/backend.hcl" ]; then
+            cat > "$TF_DIR/backend.hcl" <<'HCL'
 bucket = "testdemobackend03096174636"
 key    = "client-uptime-report-obs/terraform.tfstate"
 region = "us-east-1"
 HCL
+          fi
 
-        cd "$TF_DIR"
-        terraform init -input=false -backend-config=backend.hcl -reconfigure
-        terraform validate
-        if [ -f dev.tfvars ]; then
-          terraform plan -input=false -var-file=dev.tfvars
-        else
-          terraform plan -input=false
-        fi
-        if [ "$TF_PLAN_ONLY_STR" = "false" ]; then
-          if [ -f dev.tfvars ]; then terraform apply -input=false -auto-approve -var-file=dev.tfvars; else terraform apply -input=false -auto-approve; fi
-        fi
+          cd "$TF_DIR"
 
-        if [ -n "${ADO_PAT:-}" ] && [ -f ~/.netrc ]; then shred -u ~/.netrc || rm -f ~/.netrc; fi
+          echo "terraform init (S3 backend)"
+          terraform init -input=false -backend-config=backend.hcl -reconfigure
+
+          echo "terraform validate"
+          terraform validate
+
+          if [ -f "dev.tfvars" ]; then
+            terraform plan -input=false -var-file="dev.tfvars"
+          else
+            terraform plan -input=false
+          fi
+
+          if [ "$TF_PLAN_ONLY_STR" = "false" ]; then
+            echo "Apply enabled"
+            if [ -f "dev.tfvars" ]; then
+              terraform apply -input=false -auto-approve -var-file="dev.tfvars"
+            else
+              terraform apply -input=false -auto-approve
+            fi
+          else
+            echo "Plan-only mode: skipping apply."
+          fi
+
+          # cleanup netrc
+          if [ -n "${ADO_PAT:-}" ] && [ -f ~/.netrc ]; then
+            shred -u ~/.netrc || rm -f ~/.netrc
+          fi
       env:
         ADO_PAT: ${{ parameters.adoPat }}
         TF_PLAN_ONLY: ${{ parameters.tfPlanOnly }}
         TF_WORKING_DIR: ${{ parameters.tfWorkingDir }}
-      displayName: Terraform plan/apply
