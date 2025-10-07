@@ -1,13 +1,5 @@
-ted and elapsed
-Just now
-<1s
-Related
-0 work items
-0 artifacts
-Tests and coverage
-Get started
-Errors
-1
-The pipeline is not valid. Job Terraform_Deploy: Variable group ArtifactoryReadOnlyAcct could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz Job Terraform_Deploy: Variable group AzureGitCreds could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz
-20251007.18
-View documentation for troubleshooting failed runs
+samc-dev-synthetics-role – trusted: synthetics.amazonaws.com, lambda.amazonaws.com; perms: s3:*, logs:*, cloudwatch:*, xray:*.
+
+samc-dev-uptime-lambda-role – trusted: lambda.amazonaws.com; perms: s3:*, logs:*, cloudwatch:*, quicksight:*, xray:*.
+
+samc-dev-scheduler-role – trusted: scheduler.amazonaws.com; perms: lambda:InvokeFunction.
