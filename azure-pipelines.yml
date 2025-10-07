@@ -13,37 +13,7 @@ parameters:
   default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
 
 - name: awsRegion
-  type: stringtarting: Terraform init/plan/apply (AWS creds)
-==============================================================================
-Task         : AWS Shell Script
-Description  : Run a shell script using Bash with AWS credentials as environment variables
-Version      : 1.22.0
-Author       : Amazon Web Services
-Help         : Runs a shell script in Bash, setting AWS credentials and region information into the shell environment using the standard environment keys _AWS_ACCESS_KEY_ID_, _AWS_SECRET_ACCESS_KEY_, _AWS_SESSION_TOKEN_ and _AWS_REGION_.
-
-More information on this task can be found in the [task reference](https://docs.aws.amazon.com/vsts/latest/userguide/awsshell.html).
-
-####Task Permissions
-Permissions for this task to call AWS service APIs depend on the activities in the supplied script.
-==============================================================================
-Configuring credentials for task
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-Skipping OIDC: not enabled in service connections
-...configuring AWS credentials from service endpoint '11cf86a4-f69a-4e2d-be1d-f04c57ad0062'
-...endpoint defines standard access/secret key credentials
-Configuring region for task
-...configured to use region us-east-1, defined in task.
-/usr/bin/bash /home/vsts/work/_temp/awsshellscript_2343.sh
-Sanity: cross-project repo access (visualstudio.com)
-cd to Build.SourcesDirectory, then into TF working dir
-Files here:
-total 12
-drwxr-xr-x 3 vsts vsts 4096 Oct  7 17:38 .
-drwxr-xr-x 7 vsts vsts 4096 Oct  7 17:38 ..
-drwxr-xr-x 3 vsts vsts 4096 Oct  7 17:38 Client-Uptime-Report-obs
-terraform init (moduleRef=refs/tags/4.2.0)
-
+  type: string
   default: "us-east-1"
   values: ["us-east-1","us-east-2"]
 
@@ -59,13 +29,13 @@ terraform init (moduleRef=refs/tags/4.2.0)
   type: boolean
   default: true
 
-- name: adoPat
+- name: adoPat                # PAT with Code:Read on DEVOPS_Platform_as_a_Service
   type: string
-  default: ""               # PAT with Code:Read on DEVOPS_Platform_as_a_Service
+  default: ""
 
-- name: tfWorkingDir
+- name: tfWorkingDir          # your TF files are at repo root
   type: string
-  default: "."              # your TF files are at repo root
+  default: "."
 
 pool:
   vmImage: "ubuntu-latest"
@@ -119,8 +89,8 @@ stages:
             echo "Sanity: cross-project repo access (visualstudio.com)"
             git ls-remote "https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3" >/dev/null
 
-            echo "cd to Build.SourcesDirectory, then into TF working dir"
-            cd "$(Build.SourcesDirectory)"
+            echo "cd to Build.SourcesDirectory/Build.Repository.Name, then into TF working dir"
+            cd "$(Build.SourcesDirectory)/$(Build.Repository.Name)"
             cd "${TF_WORKING_DIR}"
 
             echo "Files here:"
