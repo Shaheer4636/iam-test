@@ -1,5 +1,42 @@
-samc-dev-synthetics-role – trusted: synthetics.amazonaws.com, lambda.amazonaws.com; perms: s3:*, logs:*, cloudwatch:*, xray:*.
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/7.7.0
+    - repository: s3
+      type: git
+      name: DEVOPS_Platform_as_a_Service/s3
+      ref: refs/tags/4.2.0
 
-samc-dev-uptime-lambda-role – trusted: lambda.amazonaws.com; perms: s3:*, logs:*, cloudwatch:*, quicksight:*, xray:*.
+trigger: none
 
-samc-dev-scheduler-role – trusted: scheduler.amazonaws.com; perms: lambda:InvokeFunction.
+# Add groups so the template compiles
+variables:
+- group: CrossProjectGitPAT
+- group: ArtifactoryReadOnlyAcct
+- group: AzureGitCreds
+
+parameters:
+- name: sandbox
+  displayName: Deploy QuickSetup vpc SAMC env to SAMC
+  type: boolean
+  default: false
+- name: terrformPLANonly
+  displayName: tfPlanOnly (check == true)
+  type: boolean
+  default: false
+
+stages:
+- template: deploy/tf-create-infra-template.yml@templates
+  parameters:
+    environment: sandbox
+    environmentDisplayName: sandbox
+    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+    tfVersion: 1.13.3
+    application: QuickSetup
+    pipelineSrcDir: $(Build.Repository.Name)
+    tfPlanOnly: ${{ parameters.terrformPLANonly }}
+    regionName: us-east-1
+    checkoutTemplate: gitCheckouts.yml
