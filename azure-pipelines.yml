@@ -1,13 +1,127 @@
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
+variable "aws_region" {
+  description = "AWS region to deploy into"
+  type        = string
+  default     = "us-east-1"
 }
 
-provider "aws" {
-  region = var.aws_region
+# Pin the external module to a ref (tag/branch/commit)
+variable "module_ref" {
+  description = "ADO Git ref for the s3 module, e.g. refs/tags/4.2.0"
+  type        = string
+  default     = "refs/tags/4.2.0"
+}
+
+variable "bucket_name" {
+  description = "S3 bucket name (will be lowercased)"
+  type        = string
+}
+
+variable "versioning_enabled" {
+  description = "Enable S3 versioning"
+  type        = bool
+  default     = true
+}
+
+variable "force_destroy" {
+  description = "Allow destroy even with non-empty bucket"
+  type        = bool
+  default     = false
+}
+
+variable "block_public_acls" {
+  type    = bool
+  default = true
+}
+
+variable "block_public_policy" {
+  type    = bool
+  default = true
+}
+
+variable "ignore_public_acls" {
+  type    = bool
+  default = true
+}
+
+variable "restrict_public_buckets" {
+  type    = bool
+  default = true
+}
+
+variable "control_object_ownership" {
+  description = "Enable/disable object ownership control toggle in module"
+  type        = bool
+  default     = true
+}
+
+variable "object_ownership" {
+  description = "Valid values: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter"
+  type        = string
+  default     = "BucketOwnerEnforced"
+}
+
+variable "object_lock_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "object_lock_configuration" {
+  description = "Pass-through to module; set to null if unused"
+  type        = any
+  default     = null
+}
+
+variable "lifecycle_rule" {
+  description = "List of lifecycle rule objects expected by the module"
+  type        = any
+  default     = []
+}
+
+variable "server_side_encryption_configuration" {
+  description = "Server-side encryption configuration object for the bucket"
+  type        = any
+  default     = null
+}
+
+variable "bucket_policy_json" {
+  description = "Complete bucket policy JSON (string). Leave empty for none."
+  type        = string
+  default     = null
+}
+
+variable "continuous_backups_enabled" {
+  description = "Tag only, for your internal reporting"
+  type        = bool
+  default     = false
+}
+
+variable "tags" {
+  description = "Additional tags to merge"
+  type        = map(string)
+  default     = {}
+}
+
+# ACL/Grant passthrough for aws_s3_bucket_acl resource
+variable "acl" {
+  description = "Canned ACL or null"
+  type        = string
+  default     = null
+}
+
+variable "grant" {
+  description = "Either a list(map) of grants or a JSON string representing that structure"
+  type        = any
+  default     = []
+}
+
+variable "owner" {
+  description = "Optional owner map { id = canonical_id, display_name = ... }"
+  type        = map(string)
+  default     = {}
+}
+
+variable "expected_bucket_owner" {
+  description = "Account ID expected to own the bucket"
+  type        = string
+  default     = null
 }
