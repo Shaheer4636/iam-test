@@ -1,49 +1,27 @@
-aws_region  = "us-east-1"
-bucket_name = "client-uptime-report-obs-artifacts"
+│ with the configuration, described below.
+│ 
+│ The Terraform configuration must be valid before initialization so that
+│ Terraform can determine which modules and providers need to be installed.
+│ 
+│ 
+╵
+╷
+│ Error: Argument or block definition required
+│ 
+│   on s3.tf line 46, in resource "aws_s3_bucket_acl" "this":
+│   46:     ? 0
+│ 
+│ An argument or block definition is required here.
+╵
+╷
+│ Error: Invalid single-argument block definition
+│ 
+│   on variables.tf line 24, in variable "block_public_acls":
+│   24: variable "block_public_acls"          { type = bool default = true }
+│ 
+│ A single-line block definition must end with a closing brace immediately
+│ after its single argument definition.
+╵
 
-versioning_enabled = true
-force_destroy      = false
-
-block_public_acls         = true
-block_public_policy       = true
-ignore_public_acls        = true
-restrict_public_buckets   = true
-
-control_object_ownership  = true
-object_ownership          = "BucketOwnerEnforced"
-
-object_lock_enabled       = false
-object_lock_configuration = null
-
-lifecycle_rule = [
-  {
-    id      = "noncurrent-30"
-    enabled = true
-    noncurrent_version_expiration = {
-      days = 30
-    }
-  }
-]
-
-server_side_encryption_configuration = {
-  rule = {
-    apply_server_side_encryption_by_default = {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = "alias/aws/s3"
-    }
-  }
-}
-
-bucket_policy_json         = null
-continuous_backups_enabled = false
-
-tags = {
-  env         = "sandbox"
-  owner       = "observability"
-  application = "client-uptime-report-obs"
-}
-
-acl                   = null
-grant                 = []
-owner                 = {}
-expected_bucket_owner = null
+##[error]Error: The process '/usr/bin/bash' failed with exit code 1
+Finishing: Terraform init/plan/apply (AWS creds)
