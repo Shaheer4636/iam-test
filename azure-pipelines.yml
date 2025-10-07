@@ -1,7 +1,72 @@
-module "s3_bucket" {
-  source = "git::ssh://git@ssh.dev.azure.com:22/v3/samcado/Infrastructure%20Operations/DEVOPS_Platform_as_a_Service/s3//terraform-3.1.0-s3-bucket?ref=refs/tags/4.2.0"
+data "aws_canonical_user_id" "this" {}
 
-  bucket_name        = "client-uptime-report-obs-artifacts"
-  versioning_enabled = true
-  # ...other required inputs
+locals {
+  grants = try(jsondecode(var.grant), var.grant)
+
+}
+module "s3" {
+  source = "./terraform-3.1.0-s3-bucket"
+
+  bucket = local.lower_bucket_name
+  versioning = {
+    enabled = var.versioning_enabled
+  }
+  attach_policy                        = true
+  force_destroy                        = local.forced_destroy
+  block_public_acls                    = var.block_public_acls
+  block_public_policy                  = var.block_public_policy
+  server_side_encryption_configuration = local.encrypt_conf
+  policy                               = local.policy
+  ignore_public_acls                   = var.ignore_public_acls
+  lifecycle_rule                       = var.lifecycle_rule
+  restrict_public_buckets              = var.restrict_public_buckets
+  control_object_ownership             = var.control_object_ownership
+  object_ownership                     = var.object_ownership
+  object_lock_enabled                  = var.object_lock_enabled
+  object_lock_configuration            = var.object_lock_configuration
+  tags = merge({
+    Name                         = local.lower_bucket_name,
+    "continuous_backups_enabled" = var.continuous_backups_enabled
+    },
+  local.tags)
+}
+
+resource "aws_s3_bucket_acl" "this" {
+  depends_on = [
+    module.s3
+
+  ]
+  count = var.object_ownership == "BucketOwnerEnforced" ? 0 : ((var.acl != null && var.acl != "null" && var.acl != "") || length(local.grants) > 0 ? 1 : 0)
+
+  bucket                = module.s3.s3_bucket_id
+  expected_bucket_owner = var.expected_bucket_owner
+
+  # hack when `null` value can't be used (eg, from terragrunt, https://github.com/gruntwork-io/terragrunt/pull/1367)
+  acl = var.acl != null ? var.acl : null
+
+  dynamic "access_control_policy" {
+    for_each = length(local.grants) > 0 ? [true] : []
+
+    content {
+      dynamic "grant" {
+        for_each = local.grants
+
+        content {
+          permission = grant.value.permission
+
+          grantee {
+            type          = grant.value.type
+            id            = try(grant.value.id, null)
+            uri           = try(grant.value.uri, null)
+            email_address = try(grant.value.email, null)
+          }
+        }
+      }
+
+      owner {
+        id           = try(var.owner["id"], data.aws_canonical_user_id.this.id)
+        display_name = try(var.owner["display_name"], null)
+      }
+    }
+  }
 }
