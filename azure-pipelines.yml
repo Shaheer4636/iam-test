@@ -1,119 +1,69 @@
-variable "aws_region" {
-  description = "AWS region to deploy into"
-  type        = string
-  default     = "us-east-1"
+# dev.tfvars — opinionated
+
+aws_region        = "us-east-1"
+bucket_name       = "myapp-dev-artifacts"
+versioning_enabled = true
+force_destroy      = true
+
+# Block all public access in dev (recommended)
+block_public_acls       = true
+block_public_policy     = true
+ignore_public_acls      = true
+restrict_public_buckets = true
+
+# Ownership & object-lock
+control_object_ownership = true
+object_ownership         = "BucketOwnerEnforced"
+object_lock_enabled      = false
+object_lock_configuration = null
+
+# Simple SSE with S3-managed keys (no KMS setup needed)
+server_side_encryption_configuration = {
+  rule = {
+    apply_server_side_encryption_by_default = {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = false
+  }
 }
 
-variable "bucket_name" {
-  description = "S3 bucket name (will be lowercased)"
-  type        = string
-}
+# Keep dev buckets tidy: transition logs/, expire old versions
+lifecycle_rule = [
+  {
+    id                                   = "expire-old-versions"
+    enabled                              = true
+    noncurrent_version_expiration = { days = 30 }
+    abort_incomplete_multipart_upload_days = 7
+    tags = { rule = "expire" }
+  },
+  {
+    id      = "logs-transition"
+    enabled = true
+    filter  = { prefix = "logs/" }
+    transition = [{
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }]
+    expiration = { days = 365 }
+  }
+]
 
-variable "versioning_enabled" {
-  description = "Enable S3 versioning"
-  type        = bool
-  default     = true
-}
+# Leave null unless you truly need a custom JSON policy
+bucket_policy_json = null
 
-variable "force_destroy" {
-  description = "Allow destroy even with non-empty bucket"
-  type        = bool
-  default     = false
-}
+# Tag-only flag for your reporting
+continuous_backups_enabled = false
 
-variable "block_public_acls" {
-  type    = bool
-  default = true
-}
+# ACL/grants/owner: keep defaults locked down in dev
+acl   = null
+grant = []
+owner = {}
 
-variable "block_public_policy" {
-  type    = bool
-  default = true
-}
+# Set to your AWS account ID to enforce ownership, or leave null
+expected_bucket_owner = null
 
-variable "ignore_public_acls" {
-  type    = bool
-  default = true
-}
+# Global tags
+tags = {
+  Environment = "dev"
 
-variable "restrict_public_buckets" {
-  type    = bool
-  default = true
-}
-
-variable "control_object_ownership" {
-  description = "Enable/disable object ownership control toggle in module"
-  type        = bool
-  default     = true
-}
-
-variable "object_ownership" {
-  description = "Valid values: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter"
-  type        = string
-  default     = "BucketOwnerEnforced"
-}
-
-variable "object_lock_enabled" {
-  type    = bool
-  default = false
-}
-
-variable "object_lock_configuration" {
-  description = "Pass-through to module; set to null if unused"
-  type        = any
-  default     = null
-}
-
-variable "lifecycle_rule" {
-  description = "List of lifecycle rule objects expected by the module"
-  type        = any
-  default     = []
-}
-
-variable "server_side_encryption_configuration" {
-  description = "Server-side encryption configuration object for the bucket"
-  type        = any
-  default     = null
-}
-
-variable "bucket_policy_json" {
-  description = "Complete bucket policy JSON (string). Leave empty for none."
-  type        = string
-  default     = null
-}
-
-variable "continuous_backups_enabled" {
-  description = "Tag only, for your internal reporting"
-  type        = bool
-  default     = false
-}
-
-variable "tags" {
-  description = "Additional tags to merge"
-  type        = map(string)
-  default     = {}
-}
-
-variable "acl" {
-  description = "Canned ACL or null"
-  type        = string
-  default     = null
-}
-
-variable "grant" {
-  description = "Either a list(map) of grants or a JSON string representing that structure"
-  type        = any
-  default     = []
-}
-
-variable "owner" {
-  description = "Optional owner map { id = canonical_id, display_name = ... }"
-  type        = map(string)
-  default     = {}
-}
-
-variable "expected_bucket_owner" {
-  description = "Account ID expected to own the bucket"
-  type        = string
-  default     = null
 }
