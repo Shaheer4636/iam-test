@@ -1,1 +1,40 @@
-The pipeline is not valid. Job Terraform_Deploy: Variable group ArtifactoryReadOnlyAcct could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz Job Terraform_Deploy: Variable group AzureGitCreds could not be found. The variable group does not exist or has not been authorized for use. For authorization details, refer to https://aka.ms/yamlauthz
+# gitCheckouts.yml
+# Purpose: avoid Library variable groups by using OAuth token or a single PAT var.
+
+parameters:
+  usePat: false     # true to use $(ADO_PAT); false uses $(System.AccessToken)
+  org: 'samcado'
+  project: 'DEVOPS_Platform_as_a_Service'
+
+steps:
+  - checkout: self
+
+  # Seed ~/.netrc for Git HTTPS auth so Terraform can fetch private module repos
+  - ${{ if eq(parameters.usePat, true) }}:
+    - script: |
+        set -eux
+        umask 077
+        cat > ~/.netrc << 'EOF'
+        machine ${{ parameters.org }}.visualstudio.com
+          login AzureDevOps
+          password $(ADO_PAT)
+        machine dev.azure.com
+          login AzureDevOps
+          password $(ADO_PAT)
+        EOF
+      displayName: "Auth for Git (PAT)"
+  - ${{ if not(eq(parameters.usePat, true)) }}:
+    - script: |
+        set -eux
+        umask 077
+        cat > ~/.netrc << 'EOF'
+        machine ${{ parameters.org }}.visualstudio.com
+          login AzureDevOps
+          password $(System.AccessToken)
+        machine dev.azure.com
+          login AzureDevOps
+          password $(System.AccessToken)
+        EOF
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      displayName: "Auth for Git (System.AccessToken)"
