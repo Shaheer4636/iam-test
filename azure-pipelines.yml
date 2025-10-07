@@ -16,12 +16,17 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/iam-controls
       ref: refs/tags/3.0.0
+    # REQUIRED for any template/step that does `checkout: s3`
+    - repository: s3
+      type: git
+      name: DEVOPS_Platform_as_a_Service/s3
+      ref: refs/tags/4.2.0
 
 trigger: none
 
 parameters:
 - name: sandbox
-  displayName: Deploy QuickSetup vpc SAMC env to SAMC 
+  displayName: Deploy QuickSetup vpc SAMC env to SAMC
   type: boolean
   default: false
 - name: terrformPLANonly
