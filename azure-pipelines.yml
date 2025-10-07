@@ -1,3 +1,132 @@
+# azure-pipeline.yml
+trigger: none
 
-Encountered error(s) while parsing pipeline YAML:
-/azure-pipeline.yml: (Line: 70, Col: 1, Idx: 1893) - (Line: 70, Col: 1, Idx: 1893): While scanning a simple key, could not find expected ':'.
+parameters:
+- name: awsServiceConnection
+  type: string
+  default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
+
+- name: awsRegion
+  type: string
+  default: "us-east-1"
+  values:
+  - "us-east-1"
+  - "us-east-2"
+
+- name: tfPlanOnly
+  type: boolean
+  default: true
+
+- name: adoPat
+  type: string
+  default: ""   # PAT with Code:Read on DEVOPS_Platform_as_a_Service
+
+- name: tfWorkingDir
+  type: string
+  default: "auto"   # auto-discover folder with *.tf
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: s3
+  displayName: Deploy S3 (S3 backend)
+  jobs:
+  - job: terraform
+    displayName: Terraform init/plan/apply
+    steps:
+    - checkout: self
+
+    - script: |
+        set -e
+        sudo apt-get update -y
+        sudo apt-get install -y unzip jq
+        TFV="1.12.2"
+        curl -sSLo /tmp/terraform_${TFV}_linux_amd64.zip "https://releases.hashicorp.com/terraform/${TFV}/terraform_${TFV}_linux_amd64.zip"
+        sudo unzip -o /tmp/terraform_${TFV}_linux_amd64.zip -d /usr/local/bin
+        terraform -version
+        jq --version
+      displayName: Install Terraform
+
+    - task: AWSShellScript@1
+      displayName: Terraform init/plan/apply (AWS creds)
+      inputs:
+        awsCredentials: ${{ parameters.awsServiceConnection }}
+        regionName: ${{ parameters.awsRegion }}
+        scriptType: inline
+        inlineScript: |
+          set -euo pipefail
+          export TF_IN_AUTOMATION=1
+          export GIT_TERMINAL_PROMPT=0
+
+          # Auth for ADO Git (PAT via ~/.netrc), needed to fetch the module
+          if [ -n "${ADO_PAT:-}" ]; then
+            umask 077
+            cat > ~/.netrc <<EOF
+machine samcado.visualstudio.com
+  login pat
+  password ${ADO_PAT}
+machine dev.azure.com
+  login pat
+  password ${ADO_PAT}
+EOF
+          fi
+
+          # Locate the repo root (some orgs nest under $(Build.Repository.Name))
+          BASE="$(Build.SourcesDirectory)"
+          REPO="$(Build.Repository.Name)"
+          if [ -d "$BASE/$REPO" ]; then ROOT="$BASE/$REPO"; else ROOT="$BASE"; fi
+          echo "ROOT = $ROOT"
+
+          # Resolve Terraform working dir
+          if [ "${TF_WORKING_DIR}" = "auto" ]; then
+            TF_DIR="$(find "$ROOT" -maxdepth 4 -type f -name '*.tf' -printf '%h\n' | sort -u | head -n 1 || true)"
+            if [ -z "$TF_DIR" ]; then
+              echo "ERROR: No Terraform files (*.tf) found under $ROOT"
+              exit 51
+            fi
+          else
+            TF_DIR="$ROOT/${TF_WORKING_DIR}"
+          fi
+
+          echo "Using TF dir: $TF_DIR"
+          ls -la "$TF_DIR"
+
+          # Ensure backend.hcl exists (your requested bucket)
+          if [ ! -f "$TF_DIR/backend.hcl" ]; then
+            cat > "$TF_DIR/backend.hcl" <<'HCL'
+bucket = "testdemobackend03096174636"
+key    = "client-uptime-report-obs/terraform.tfstate"
+region = "us-east-1"
+HCL
+          fi
+
+          cd "$TF_DIR"
+
+          echo "terraform init (S3 backend)"
+          terraform init -input=false -backend-config=backend.hcl -reconfigure
+
+          echo "terraform validate"
+          terraform validate
+
+          if [ -f "dev.tfvars" ]; then
+            echo "terraform plan (dev.tfvars)"
+            terraform plan -input=false -var-file="dev.tfvars"
+          else
+            echo "terraform plan (no tfvars)"
+            terraform plan -input=false
+          fi
+
+          if [ "${TF_PLAN_ONLY}" = "false" ]; then
+            if [ -f "dev.tfvars" ]; then
+              terraform apply -input=false -auto-approve -var-file="dev.tfvars"
+            else
+              terraform apply -input=false -auto-approve
+            fi
+          else
+            echo "Plan-only mode: skipping apply."
+          fi
+      env:
+        ADO_PAT: ${{ parameters.adoPat }}
+        TF_PLAN_ONLY: ${{ parameters.tfPlanOnly }}
+        TF_WORKING_DIR: ${{ parameters.tfWorkingDir }}
