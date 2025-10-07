@@ -1,1 +1,2 @@
-The pipeline is not valid. Job Job: Step AWSShellScript input awsCredentials expects a service connection of type AWS but the provided service connection SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations is of type AWSServiceEndpoint.
+User name,Password,Console sign-in URL
+devtemtest,h|&Mk4o},https://333661424489.signin.aws.amazon.com/console
