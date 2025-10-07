@@ -1,5 +1,7 @@
+# azure-pipelines.yml
 trigger: none
 
+# (Optional) repo reference so Azure can pre-authorize cross-project access
 resources:
   repositories:
     - repository: s3mod
@@ -15,7 +17,9 @@ parameters:
 - name: awsRegion
   type: string
   default: "us-east-1"
-  values: ["us-east-1","us-east-2"]
+  values:
+    - "us-east-1"
+    - "us-east-2"
 
 - name: tfPlanOnly
   type: boolean
@@ -23,22 +27,22 @@ parameters:
 
 - name: adoPat
   type: string
-  default: ""   # PAT with Code:Read on DEVOPS_Platform_as_a_Service
+  default: ""     # PAT with Code:Read on DEVOPS_Platform_as_a_Service
 
-# Set to "auto" to find the folder with .tf files, or set an explicit relative path (e.g., ".", "infra")
+# "auto" will scan for the first folder containing *.tf; set an explicit path if you prefer
 - name: tfWorkingDir
   type: string
   default: "auto"
 
 pool:
-  vmImage: "ubuntu-latest"
+  vmImage: ubuntu-latest
 
 stages:
 - stage: s3
-  displayName: "Deploy S3 module (visualstudio.com + S3 backend)"
+  displayName: Deploy S3 module (visualstudio.com + S3 backend)
   jobs:
   - job: terraform
-    displayName: "Terraform init/plan/apply"
+    displayName: Terraform init/plan/apply
     steps:
       - checkout: self
       - checkout: s3mod
@@ -47,50 +51,46 @@ stages:
       - script: |
           set -e
           sudo apt-get update -y
-          sudo apt-get install -y unzip jq tree
+          sudo apt-get install -y unzip jq
           TFV="1.12.2"
           curl -sSLo /tmp/terraform_${TFV}_linux_amd64.zip "https://releases.hashicorp.com/terraform/${TFV}/terraform_${TFV}_linux_amd64.zip"
           sudo unzip -o /tmp/terraform_${TFV}_linux_amd64.zip -d /usr/local/bin
           terraform -version
           jq --version
-          echo "Sources at: $(Build.SourcesDirectory)"
-          echo "Repo name:  $(Build.Repository.Name)"
-          echo "Tree (top 3 levels):"
-          ( cd "$(Build.SourcesDirectory)" && tree -L 3 || true )
-        displayName: "Install Terraform + show checkout tree"
+          echo "Sources: $(Build.SourcesDirectory)"
+          echo "Repo:    $(Build.Repository.Name)"
+        displayName: Install Terraform + tools
 
       - task: AWSShellScript@1
-        displayName: "Terraform init/plan/apply (AWS creds)"
+        displayName: Terraform init/plan/apply (AWS creds)
         inputs:
           awsCredentials: ${{ parameters.awsServiceConnection }}
           regionName: ${{ parameters.awsRegion }}
-          scriptType: "inline"
+          scriptType: inline
           inlineScript: |
             set -euo pipefail
             export TF_IN_AUTOMATION=1
             export GIT_TERMINAL_PROMPT=0
 
-            # ---- Auth for ADO git (PAT -> ~/.netrc) ----
+            # --- Auth for ADO Git using PAT via ~/.netrc (non-interactive) ---
             if [ -n "${ADO_PAT:-}" ]; then
               umask 077
-              {
-                echo "machine samcado.visualstudio.com"
-                echo "  login pat"
-                echo "  password ${ADO_PAT}"
-                echo "machine dev.azure.com"
-                echo "  login pat"
-                echo "  password ${ADO_PAT}"
-              } > ~/.netrc
+              cat > ~/.netrc <<EOF
+machine samcado.visualstudio.com
+  login pat
+  password ${ADO_PAT}
+machine dev.azure.com
+  login pat
+  password ${ADO_PAT}
+EOF
             fi
-            # --------------------------------------------
+            # -----------------------------------------------------------------
 
-            echo "Sanity: cross-project module repo (visualstudio.com)"
+            echo "Sanity: cross-project repo access"
             git ls-remote "https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3" >/dev/null
 
             BASE="$(Build.SourcesDirectory)"
             REPO="$(Build.Repository.Name)"
-
-            # Some orgs check out into either BASE or BASE/REPO; normalize
             if [ -d "$BASE/$REPO" ]; then
               ROOT="$BASE/$REPO"
             else
@@ -98,61 +98,48 @@ stages:
             fi
             echo "Detected root: $ROOT"
 
-            # Auto-detect TF working dir if requested
-            TF_DIR_INPUT="${TF_WORKING_DIR}"
-            if [ "$TF_DIR_INPUT" = "auto" ]; then
-              echo "Auto-detecting Terraform working directory..."
-              # find first directory (depth<=4) that contains any *.tf
-              TF_DIR=$(find "$ROOT" -maxdepth 4 -type f -name "*.tf" -printf '%h\n' | sort -u | head -n 1 || true)
+            # Resolve working dir
+            if [ "${TF_WORKING_DIR}" = "auto" ]; then
+              TF_DIR="$(find "$ROOT" -maxdepth 4 -type f -name '*.tf' -printf '%h\n' | sort -u | head -n 1 || true)"
               if [ -z "$TF_DIR" ]; then
                 echo "ERROR: No Terraform files (*.tf) found under $ROOT"
                 exit 51
               fi
             else
-              TF_DIR="$ROOT/$TF_DIR_INPUT"
+              TF_DIR="$ROOT/${TF_WORKING_DIR}"
             fi
-
             echo "Using Terraform working dir: $TF_DIR"
             ls -la "$TF_DIR"
 
-            # Ensure backend.hcl exists (you said to use this bucket)
+            # Ensure backend.hcl exists (your bucket)
             if [ ! -f "$TF_DIR/backend.hcl" ]; then
               cat > "$TF_DIR/backend.hcl" <<'HCL'
 bucket = "testdemobackend03096174636"
 key    = "client-uptime-report-obs/terraform.tfstate"
 region = "us-east-1"
 HCL
-              echo "Wrote $TF_DIR/backend.hcl for S3 backend"
             fi
 
             cd "$TF_DIR"
 
-            echo "terraform init (S3 backend via backend.hcl)"
+            echo "terraform init (S3 backend)"
             terraform init -input=false -backend-config=backend.hcl -reconfigure
 
             echo "terraform validate"
             terraform validate
 
-            # Choose tfvars if present; otherwise run without
+            # Use dev.tfvars if present
             if [ -f "dev.tfvars" ]; then
-              TFVARS="dev.tfvars"
-            elif [ -f "${TFVARS_FILE:-}" ] && [ -n "${TFVARS_FILE:-}" ] && [ -f "${TFVARS_FILE}" ]; then
-              TFVARS="${TFVARS_FILE}"
+              echo "terraform plan (dev.tfvars)"
+              terraform plan -input=false -var-file="dev.tfvars"
             else
-              TFVARS=""
-            fi
-
-            echo "terraform plan"
-            if [ -n "$TFVARS" ]; then
-              terraform plan -input=false -var-file="$TFVARS"
-            else
+              echo "terraform plan (no tfvars)"
               terraform plan -input=false
             fi
 
             if [ "${TF_PLAN_ONLY}" = "false" ]; then
-              echo "terraform apply"
-              if [ -n "$TFVARS" ]; then
-                terraform apply -input=false -auto-approve -var-file="$TFVARS"
+              if [ -f "dev.tfvars" ]; then
+                terraform apply -input=false -auto-approve -var-file="dev.tfvars"
               else
                 terraform apply -input=false -auto-approve
               fi
@@ -163,4 +150,3 @@ HCL
           ADO_PAT: ${{ parameters.adoPat }}
           TF_PLAN_ONLY: ${{ parameters.tfPlanOnly }}
           TF_WORKING_DIR: ${{ parameters.tfWorkingDir }}
-          TFVARS_FILE: "dev.tfvars"
