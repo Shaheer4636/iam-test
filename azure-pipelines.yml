@@ -1,123 +1,27 @@
-trigger: none
+-rw-r--r-- 1 vsts vsts 3349 Oct  7 17:47 s3.tf
+-rw-r--r-- 1 vsts vsts 2975 Oct  7 17:47 variables.tf
+terraform init (moduleRef=refs/tags/4.2.0)
+Initializing the backend...
+Initializing modules...
+Downloading git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3?ref=refs/tags/4.2.0 for s3...
+- s3 in .terraform/modules/s3/terraform-3.1.0-s3-bucket
+╷
+│ Error: Terraform encountered problems during initialisation, including problems
+│ with the configuration, described below.
+│ 
+│ The Terraform configuration must be valid before initialization so that
+│ Terraform can determine which modules and providers need to be installed.
+│ 
+│ 
+╵
+╷
+│ Error: Argument or block definition required
+│ 
+│   on s3.tf line 55, in resource "aws_s3_bucket_acl" "this":
+│   55:     ? 0
+│ 
+│ An argument or block definition is required here.
+╵
 
-resources:
-  repositories:
-    - repository: s3mod
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-
-parameters:
-- name: awsServiceConnection
-  type: string
-  default: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
-
-- name: awsRegion
-  type: string
-  default: "us-east-1"
-  values: ["us-east-1","us-east-2"]
-
-- name: moduleRef
-  type: string
-  default: "refs/tags/4.2.0"
-
-- name: tfvarsFile
-  type: string
-  default: "dev.tfvars"     # relative to tfWorkingDir
-
-- name: tfPlanOnly
-  type: boolean
-  default: true
-
-- name: adoPat                # PAT with Code:Read on DEVOPS_Platform_as_a_Service
-  type: string
-  default: ""
-
-- name: tfWorkingDir          # your TF files are at repo root
-  type: string
-  default: "."
-
-pool:
-  vmImage: "ubuntu-latest"
-
-stages:
-- stage: s3
-  displayName: "Deploy S3 module (visualstudio.com + PAT)"
-  jobs:
-  - job: terraform
-    displayName: "Terraform init/plan/apply"
-    steps:
-      - checkout: self
-      - checkout: s3mod
-        path: _authorized_s3_repo
-
-      - script: |
-          set -e
-          sudo apt-get update -y
-          sudo apt-get install -y unzip jq
-          TFV="1.12.2"
-          curl -sSLo /tmp/terraform_${TFV}_linux_amd64.zip "https://releases.hashicorp.com/terraform/${TFV}/terraform_${TFV}_linux_amd64.zip"
-          sudo unzip -o /tmp/terraform_${TFV}_linux_amd64.zip -d /usr/local/bin
-          terraform -version
-          jq --version
-        displayName: "Install Terraform 1.12.2 + jq"
-
-      - task: AWSShellScript@1
-        displayName: "Terraform init/plan/apply (AWS creds)"
-        inputs:
-          awsCredentials: ${{ parameters.awsServiceConnection }}
-          regionName: ${{ parameters.awsRegion }}
-          scriptType: "inline"
-          inlineScript: |
-            set -euo pipefail
-            export TF_IN_AUTOMATION=1
-            export GIT_TERMINAL_PROMPT=0
-
-            # Auth for visualstudio.com/dev.azure.com using PAT via ~/.netrc
-            if [ -n "${ADO_PAT:-}" ]; then
-              umask 077
-              {
-                echo "machine samcado.visualstudio.com"
-                echo "  login pat"
-                echo "  password ${ADO_PAT}"
-                echo "machine dev.azure.com"
-                echo "  login pat"
-                echo "  password ${ADO_PAT}"
-              } > ~/.netrc
-            fi
-
-            echo "Sanity: cross-project repo access (visualstudio.com)"
-            git ls-remote "https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3" >/dev/null
-
-            echo "cd to Build.SourcesDirectory/Build.Repository.Name, then into TF working dir"
-            cd "$(Build.SourcesDirectory)/$(Build.Repository.Name)"
-            cd "${TF_WORKING_DIR}"
-
-            echo "Files here:"
-            ls -la
-
-            echo "terraform init (moduleRef=${MODULE_REF})"
-            terraform init -input=false
-
-            echo "terraform validate"
-            terraform validate
-
-            echo "terraform plan (-var-file=${TFVARS_FILE})"
-            terraform plan -input=false \
-              -var "module_ref=${MODULE_REF}" \
-              -var-file="${TFVARS_FILE}"
-
-            if [ "${TF_PLAN_ONLY}" = "false" ]; then
-              echo "terraform apply"
-              terraform apply -input=false -auto-approve \
-                -var "module_ref=${MODULE_REF}" \
-                -var-file="${TFVARS_FILE}"
-            else
-              echo "Plan-only mode active; skipping apply."
-            fi
-        env:
-          ADO_PAT: ${{ parameters.adoPat }}
-          MODULE_REF: ${{ parameters.moduleRef }}
-          TFVARS_FILE: ${{ parameters.tfvarsFile }}
-          TF_PLAN_ONLY: ${{ parameters.tfPlanOnly }}
-          TF_WORKING_DIR: ${{ parameters.tfWorkingDir }}
+##[error]Error: The process '/usr/bin/bash' failed with exit code 1
+Finishing: Terraform init/plan/apply (AWS creds)
