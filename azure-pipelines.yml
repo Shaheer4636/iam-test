@@ -1,53 +1,49 @@
-variable "aws_region" {
-  description = "AWS region to deploy into"
-  type        = string
-  default     = "us-east-1"
+aws_region  = "us-east-1"
+bucket_name = "client-uptime-report-obs-artifacts"
+
+versioning_enabled = true
+force_destroy      = false
+
+block_public_acls         = true
+block_public_policy       = true
+ignore_public_acls        = true
+restrict_public_buckets   = true
+
+control_object_ownership  = true
+object_ownership          = "BucketOwnerEnforced"
+
+object_lock_enabled       = false
+object_lock_configuration = null
+
+lifecycle_rule = [
+  {
+    id      = "noncurrent-30"
+    enabled = true
+    noncurrent_version_expiration = {
+      days = 30
+    }
+  }
+]
+
+server_side_encryption_configuration = {
+  rule = {
+    apply_server_side_encryption_by_default = {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = "alias/aws/s3"
+    }
+  }
 }
 
-variable "bucket_name" {
-  description = "S3 bucket name (will be lowercased)"
-  type        = string
+bucket_policy_json         = null
+continuous_backups_enabled = false
+
+tags = {
+  env         = "sandbox"
+  owner       = "observability"
+  application = "client-uptime-report-obs"
 }
 
-variable "versioning_enabled" {
-  description = "Enable S3 versioning"
-  type        = bool
-  default     = true
-}
-
-variable "force_destroy" {
-  description = "Allow destroy even with non-empty bucket"
-  type        = bool
-  default     = false
-}
-
-variable "block_public_acls"          { type = bool default = true }
-variable "block_public_policy"        { type = bool default = true }
-variable "ignore_public_acls"         { type = bool default = true }
-variable "restrict_public_buckets"    { type = bool default = true }
-variable "control_object_ownership"   { type = bool default = true }
-
-variable "object_ownership" {
-  description = "Valid values: BucketOwnerEnforced, BucketOwnerPreferred, ObjectWriter"
-  type        = string
-  default     = "BucketOwnerEnforced"
-}
-
-variable "object_lock_enabled"        { type = bool default = false }
-variable "object_lock_configuration"  { type = any  default = null }
-variable "lifecycle_rule"             { type = any  default = [] }
-variable "server_side_encryption_configuration" { type = any default = null }
-variable "bucket_policy_json"         { type = string default = null }
-variable "continuous_backups_enabled" { type = bool   default = false }
-variable "tags"                       { type = map(string) default = {} }
-
-# ACL/Grant passthrough for aws_s3_bucket_acl resource
-variable "acl"    { type = string default = null }
-variable "grant"  { type = any    default = [] }
-variable "owner"  { type = map(string) default = {} }
-
-variable "expected_bucket_owner" {
-  description = "Account ID expected to own the bucket"
-  type        = string
-  default     = null
-}
+acl                   = null
+grant                 = []
+owner                 = {}
+expected_bucket_owner = null
