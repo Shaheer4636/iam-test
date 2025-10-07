@@ -4,83 +4,41 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/7.7.0
-    - repository: s3
+    - repository: vpc
       type: git
-      name: DEVOPS_Platform_as_a_Service/s3
+      name: DEVOPS_Platform_as_a_Service/vpc
       ref: refs/tags/4.2.0
+    - repository: security-groups
+      type: git
+      name: DEVOPS_Platform_as_a_Service/security-groups
+      ref: refs/tags/2.40.0
+    - repository: iam-controls
+      type: git
+      name: DEVOPS_Platform_as_a_Service/iam-controls
+      ref: refs/tags/3.0.0
 
 trigger: none
 
-# Only needed if your org requires these groups; otherwise remove this block.
-variables:
-- group: CrossProjectGitPAT
-- group: ArtifactoryReadOnlyAcct
-- group: AzureGitCreds
-
 parameters:
 - name: sandbox
-  displayName: Deploy S3 to SAMC
+  displayName: Deploy QuickSetup vpc sandbox env to DevopsSandbox 889050139813
   type: boolean
   default: false
-- name: terraformPLANonly
+- name: terrformPLANonly
   displayName: tfPlanOnly (check == true)
   type: boolean
   default: false
 
 stages:
-# 0) PREP: make sure THIS repo is checked out to $(Build.SourcesDirectory)
-- stage: Prep
-  jobs:
-  - job: CheckoutSelf
-    pool: Self-hosted-AWS-Linux-pool
-    steps:
-    - checkout: self
-    - script: |
-        echo "Workspace tree (top level):"
-        ls -la $(Build.SourcesDirectory)
-        echo "Checking tfvars path:"
-        ls -la $(Build.SourcesDirectory)/vars || true
-      displayName: Show workspace (sanity)
-
-# 1) DEPLOY: call the shared template now that sources exist
-- ${{ if eq(parameters.sandbox, true) }}:
   - template: deploy/tf-create-infra-template.yml@templates
     parameters:
       environment: sandbox
       environmentDisplayName: sandbox
-      application: ClientUptime
-
-      # service connections (type: AWS)
-      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-
+      tfServiceConnection: DevopsSandbox-889050139813-DevopsIACSvcVpc-us-east-1
+      awsServiceConnection: DevopsSandbox-889050139813-DevopsIACSvcVpc
+      tfVersion: 1.13.3
+      application: QuickSetup
+      pipelineSrcDir: $(Build.Repository.Name)
+      tfPlanOnly: ${{ parameters.terrformPLANonly }}
       regionName: us-east-1
-      tfVersion: 1.3.3
-      tfPlanOnly: ${{ parameters.terraformPLANonly }}
-
-      # IMPORTANT: path that actually contains main.tf and vars/sandbox.tfvars
-      pipelineSrcDir: $(Build.SourcesDirectory)
-
       checkoutTemplate: gitCheckouts.yml
-
-      # enable only S3
-      reqS3Mod: true
-      reqEKSMod: false
-      reqMongoMod: false
-      reqDocDB: false
-      reqSSRS: false
-      reqRDSmssqlMod: false
-      reqRDSaurora: false
-      reqRDSauroraPg: false
-      reqAmazonMQMod: false
-      reqRDSmysqlMod: false
-      reqRDSoracleMod: false
-      reqEc2Mod: false
-      reqElasticsearchMod: false
-      reqElasticbeanStalkMod: false
-      reqElasticacheMod: false
-
-      folderToZip: NONE
-      JFrogFileName: NONE
-      JFrogFolderName: NONE
-      JFrogFileDestination: lambdas
