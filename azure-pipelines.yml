@@ -1,35 +1,48 @@
+############################
+# s3.tf
+############################
+
+# Canonical user ID used as fallback owner for grants
 data "aws_canonical_user_id" "this" {}
 
 locals {
+  # Allow grant to be either JSON string or HCL list(map)
   grants            = try(jsondecode(var.grant), var.grant)
   lower_bucket_name = lower(var.bucket_name)
 }
 
+# Reuse the shared S3 bucket module from your org
 module "s3" {
-  # Hard-coded ref (Terraform forbids variables in module.source)
+  # NOTE: Terraform forbids variables in module.source; keep this hard-coded
   source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=refs/tags/4.2.0"
 
   bucket = local.lower_bucket_name
 
+  # Versioning block per the module’s expected shape
   versioning = {
     enabled = var.versioning_enabled
   }
 
   attach_policy                        = true
   force_destroy                        = var.force_destroy
-  block_public_acls                    = var.block_public_acls
-  block_public_policy                  = var.block_public_policy
+
+  # Public access + ownership controls
+  block_public_acls       = var.block_public_acls
+  block_public_policy     = var.block_public_policy
+  ignore_public_acls      = var.ignore_public_acls
+  restrict_public_buckets = var.restrict_public_buckets
+
+  control_object_ownership  = var.control_object_ownership
+  object_ownership          = var.object_ownership          # e.g. "BucketOwnerEnforced"
+  object_lock_enabled       = var.object_lock_enabled
+  object_lock_configuration = var.object_lock_configuration
+
+  # SSE and optional bucket policy/lifecycle
   server_side_encryption_configuration = var.server_side_encryption_configuration
   policy                               = var.bucket_policy_json
-  ignore_public_acls                   = var.ignore_public_acls
   lifecycle_rule                       = var.lifecycle_rule
-  restrict_public_buckets              = var.restrict_public_buckets
-  control_object_ownership             = var.control_object_ownership
-  object_ownership                     = var.object_ownership
-  object_lock_enabled                  = var.object_lock_enabled
-  object_lock_configuration            = var.object_lock_configuration
 
-  # tags is map(string); cast boolean
+  # Tags (cast bool to string for module’s map(string))
   tags = merge(
     {
       Name                       = local.lower_bucket_name
@@ -39,19 +52,22 @@ module "s3" {
   )
 }
 
+# Only create an ACL resource when:
+#  - object ownership is NOT BucketOwnerEnforced (AWS forbids ACLs in that mode)
+#  - AND an ACL value or explicit grants were provided
 resource "aws_s3_bucket_acl" "this" {
   depends_on = [module.s3]
 
-  # Keep ACL only when ownership isn't enforced AND (acl set OR grants provided)
-  count = var.object_ownership == "BucketOwnerEnforced"
-    ? 0
-    : ((((var.acl != null) && (var.acl != "null") && (var.acl != "")) || (length(local.grants) > 0)) ? 1 : 0)
+  count = var.object_ownership == "BucketOwnerEnforced" ? 0 :
+          (((var.acl != null && var.acl != "null" && var.acl != "") || length(local.grants) > 0) ? 1 : 0)
 
   bucket                = module.s3.s3_bucket_id
   expected_bucket_owner = var.expected_bucket_owner
 
-  acl = var.acl != null ? var.acl : null
+  # apply only if provided (count guards empty path)
+  acl = (var.acl != null && var.acl != "null" && var.acl != "") ? var.acl : null
 
+  # Optional explicit grants
   dynamic "access_control_policy" {
     for_each = length(local.grants) > 0 ? [true] : []
     content {
