@@ -1,36 +1,76 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
+data "aws_canonical_user_id" "this" {}
 
-trigger: none
+locals {
+  grants            = try(jsondecode(var.grant), var.grant)
+  lower_bucket_name = lower(var.bucket_name)
+}
 
-parameters:
-- name: sandbox
-  displayName: Deploy S3 to sandbox
-  type: boolean
-  default: true
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
+module "s3" {
+  # Hard-coded ref (Terraform forbids variables in module.source)
+  source = "git::https://samcado.visualstudio.com/DEVOPS_Platform_as_a_Service/_git/s3//terraform-3.1.0-s3-bucket?ref=refs/tags/4.2.0"
 
-stages:
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    application: ClientUptime
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-    checkoutTemplate: gitCheckouts.yml
+  bucket = local.lower_bucket_name
+
+  versioning = {
+    enabled = var.versioning_enabled
+  }
+
+  attach_policy                        = true
+  force_destroy                        = var.force_destroy
+  block_public_acls                    = var.block_public_acls
+  block_public_policy                  = var.block_public_policy
+  server_side_encryption_configuration = var.server_side_encryption_configuration
+  policy                               = var.bucket_policy_json
+  ignore_public_acls                   = var.ignore_public_acls
+  lifecycle_rule                       = var.lifecycle_rule
+  restrict_public_buckets              = var.restrict_public_buckets
+  control_object_ownership             = var.control_object_ownership
+  object_ownership                     = var.object_ownership
+  object_lock_enabled                  = var.object_lock_enabled
+  object_lock_configuration            = var.object_lock_configuration
+
+  # tags is map(string); cast boolean
+  tags = merge(
+    {
+      Name                       = local.lower_bucket_name
+      continuous_backups_enabled = tostring(var.continuous_backups_enabled)
+    },
+    var.tags
+  )
+}
+
+resource "aws_s3_bucket_acl" "this" {
+  depends_on = [module.s3]
+
+  # Keep ACL only when ownership isn't enforced AND (acl set OR grants provided)
+  count = var.object_ownership == "BucketOwnerEnforced"
+    ? 0
+    : ((((var.acl != null) && (var.acl != "null") && (var.acl != "")) || (length(local.grants) > 0)) ? 1 : 0)
+
+  bucket                = module.s3.s3_bucket_id
+  expected_bucket_owner = var.expected_bucket_owner
+
+  acl = var.acl != null ? var.acl : null
+
+  dynamic "access_control_policy" {
+    for_each = length(local.grants) > 0 ? [true] : []
+    content {
+      dynamic "grant" {
+        for_each = local.grants
+        content {
+          permission = grant.value.permission
+          grantee {
+            type          = grant.value.type
+            id            = try(grant.value.id, null)
+            uri           = try(grant.value.uri, null)
+            email_address = try(grant.value.email, null)
+          }
+        }
+      }
+      owner {
+        id           = try(var.owner["id"], data.aws_canonical_user_id.this.id)
+        display_name = try(var.owner["display_name"], null)
+      }
+    }
+  }
+}
