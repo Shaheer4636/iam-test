@@ -1,14 +1,21 @@
+#############################################
+# Provider
+#############################################
 provider "aws" {
   region = "us-east-1"
 }
 
+#############################################
 # S3 Bucket
+#############################################
 resource "aws_s3_bucket" "test_bucket" {
   bucket = "test-s3-bucket-for-lambda-access"
   acl    = "private"
 }
 
+#############################################
 # IAM Role for Lambda (original)
+#############################################
 resource "aws_iam_role" "lambda_role" {
   name = "lambda-test-role"
 
@@ -26,7 +33,9 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
+#############################################
 # IAM Policy for full access to S3 and CloudWatch Synthetics (original)
+#############################################
 resource "aws_iam_policy" "lambda_policy" {
   name        = "lambda-full-access-policy"
   description = "Full access to S3 bucket and CloudWatch Synthetics"
@@ -62,7 +71,9 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
   policy_arn = aws_iam_policy.lambda_policy.arn
 }
 
+#############################################
 # Package Lambda function with dependencies (original)
+#############################################
 resource "null_resource" "package_lambda" {
   provisioner "local-exec" {
     command = "rm -rf lambda_build lambda_function.zip && mkdir lambda_build && cp lambda_function.py lambda_build/ && pip install -r requirements.txt -t lambda_build/ && cd lambda_build && zip -r ../lambda_function.zip ."
@@ -73,7 +84,9 @@ resource "null_resource" "package_lambda" {
   }
 }
 
-# Lambda Function (original)
+#############################################
+# Lambda Function (original, ZIP-based)
+#############################################
 resource "aws_lambda_function" "test_lambda" {
   function_name = "test-lambda-function"
   role          = aws_iam_role.lambda_role.arn
@@ -88,9 +101,9 @@ resource "aws_lambda_function" "test_lambda" {
 # ADDITIONS START HERE — as requested, no changes above
 # ============================================================
 
-# ---------------------------
-# Canary Role: S3 + CloudWatch + Logs (full)
-# ---------------------------
+#############################################
+# CloudWatch Synthetics Canary Role (full S3/CW/Logs)
+#############################################
 resource "aws_iam_role" "canary_role" {
   name = "samc-obs-sandbox-canary-role"
 
@@ -117,21 +130,21 @@ resource "aws_iam_policy" "canary_full_access" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid    = "S3Full",
-        Effect = "Allow",
-        Action = ["s3:*"],
+        Sid     = "S3Full",
+        Effect  = "Allow",
+        Action  = ["s3:*"],
         Resource = ["*"]
       },
       {
-        Sid    = "CloudWatchFull",
-        Effect = "Allow",
-        Action = ["cloudwatch:*"],
+        Sid     = "CloudWatchFull",
+        Effect  = "Allow",
+        Action  = ["cloudwatch:*"],
         Resource = ["*"]
       },
       {
-        Sid    = "LogsFull",
-        Effect = "Allow",
-        Action = ["logs:*"],
+        Sid     = "LogsFull",
+        Effect  = "Allow",
+        Action  = ["logs:*"],
         Resource = ["*"]
       }
     ]
@@ -143,9 +156,9 @@ resource "aws_iam_role_policy_attachment" "canary_attach" {
   policy_arn = aws_iam_policy.canary_full_access.arn
 }
 
-# ---------------------------
-# LambdaFunction Role: S3 + ECR + CloudWatch + Logs (full)
-# ---------------------------
+#############################################
+# Lambda Function Role for Container usage (S3 + ECR + CW/Logs)
+#############################################
 resource "aws_iam_role" "lambdafunction_role" {
   name = "samc-obs-sandbox-lambdafunction-role"
 
@@ -172,14 +185,14 @@ resource "aws_iam_policy" "lambdafunction_full_access" {
     Version = "2012-10-17",
     Statement = [
       {
-        Sid    = "S3Full",
-        Effect = "Allow",
-        Action = ["s3:*"],
+        Sid     = "S3Full",
+        Effect  = "Allow",
+        Action  = ["s3:*"],
         Resource = ["*"]
       },
       {
-        Sid    = "ECRFull",
-        Effect = "Allow",
+        Sid     = "ECRFull",
+        Effect  = "Allow",
         Action = [
           "ecr:*",
           "ecr-public:*",
@@ -189,15 +202,15 @@ resource "aws_iam_policy" "lambdafunction_full_access" {
         Resource = ["*"]
       },
       {
-        Sid    = "CloudWatchFull",
-        Effect = "Allow",
-        Action = ["cloudwatch:*"],
+        Sid     = "CloudWatchFull",
+        Effect  = "Allow",
+        Action  = ["cloudwatch:*"],
         Resource = ["*"]
       },
       {
-        Sid    = "LogsFull",
-        Effect = "Allow",
-        Action = ["logs:*"],
+        Sid     = "LogsFull",
+        Effect  = "Allow",
+        Action  = ["logs:*"],
         Resource = ["*"]
       }
     ]
@@ -209,15 +222,64 @@ resource "aws_iam_role_policy_attachment" "lambdafunction_attach" {
   policy_arn = aws_iam_policy.lambdafunction_full_access.arn
 }
 
-# Basic logging policy (optional but harmless)
+# Basic logging policy (optional but helpful)
 resource "aws_iam_role_policy_attachment" "lambdafunction_basic_logs" {
   role       = aws_iam_role.lambdafunction_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# ---------------------------
-# Outputs for the new roles
-# ---------------------------
+#############################################
+# ECR repository for Lambda container images
+#############################################
+resource "aws_ecr_repository" "client_uptime_lambda" {
+  name                 = "client-uptime-lambda"
+  image_tag_mutability = "MUTABLE"   # set to "IMMUTABLE" if you prefer immutable tags
+  force_delete         = true        # allows terraform destroy even if images exist
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"       # or "KMS" with kms_key if required
+    # kms_key       = aws_kms_key.ecr.arn
+  }
+}
+
+# Optional: lifecycle rules to control storage costs
+resource "aws_ecr_lifecycle_policy" "client_uptime_lambda" {
+  repository = aws_ecr_repository.client_uptime_lambda.name
+
+  policy = jsonencode({
+    rules = [
+      {
+        rulePriority = 1
+        description  = "Expire untagged images after 14 days"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 14
+        }
+        action = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "Keep last 20 images"
+        selection = {
+          tagStatus   = "any"
+          countType   = "imageCountMoreThan"
+          countNumber = 20
+        }
+        action = { type = "expire" }
+      }
+    ]
+  })
+}
+
+#############################################
+# Outputs for new roles and ECR
+#############################################
 output "canary_role_name" {
   value = aws_iam_role.canary_role.name
 }
@@ -232,4 +294,16 @@ output "lambdafunction_role_name" {
 
 output "lambdafunction_role_arn" {
   value = aws_iam_role.lambdafunction_role.arn
+}
+
+output "ecr_repository_name" {
+  value = aws_ecr_repository.client_uptime_lambda.name
+}
+
+output "ecr_repository_arn" {
+  value = aws_ecr_repository.client_uptime_lambda.arn
+}
+
+output "ecr_repository_url" {
+  value = aws_ecr_repository.client_uptime_lambda.repository_url
 }
