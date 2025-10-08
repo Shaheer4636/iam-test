@@ -1,3 +1,8 @@
+# ------------------------------------------------------------
+# Azure DevOps: Build Docker image, push to ECR, deploy to Lambda (container)
+# Keeps your original template stage; adds Build+Deploy stages
+# ------------------------------------------------------------
+
 resources:
   repositories:
     - repository: templates
@@ -13,7 +18,6 @@ resources:
       name: DEVOPS_Platform_as_a_Service/iam-controls
       ref: refs/tags/2.16.0
 
-
 trigger: none
 
 parameters:
@@ -26,7 +30,30 @@ parameters:
   type: boolean
   default: false
 
+# === EDIT THESE VALUES ONCE ===
+variables:
+  # The AWS account id is inferred from your service connection name (492046385895)
+  AWS_ACCOUNT_ID: '492046385895'
+  AWS_REGION: 'us-east-1'
+
+  # ECR repo to push to (created if missing)
+  ECR_REPOSITORY: 'client-uptime-lambda'
+
+  # Lambda settings
+  LAMBDA_FUNCTION_NAME: 'client-uptime-lambda-sandbox'
+  LAMBDA_ROLE_NAME: 'samc-obs-sandbox-lambdafunction-role'
+  LAMBDA_ROLE_ARN: 'arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(LAMBDA_ROLE_NAME)'
+
+  # Image tagging (unique, traceable)
+  IMAGE_TAG: '$(Build.BuildId)'
+  IMAGE_TAG_LATEST: 'latest'
+
+  # Paths
+  DOCKERFILE_PATH: 'Dockerfile'     # your Dockerfile at repo root
+  CONTEXT_PATH: '.'                 # build context at repo root (contains lambda2.py)
+
 stages:
+# --- Your existing infra/template stage (left intact) ---
 - template: deploy/tf-create-infra-template.yml@templates
   parameters:
     environment: sandbox
@@ -38,5 +65,128 @@ stages:
     application: ClientUptime
     pipelineSrcDir: $(Build.Repository.Name)
     tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
+    regionName: $(AWS_REGION)
     checkoutTemplate: gitCheckouts.yml
+
+# --- Build & Push image to ECR ---
+- stage: BuildAndPush
+  displayName: Build & Push to ECR
+  dependsOn: []
+  jobs:
+    - job: Build_Push
+      displayName: Docker Build & Push
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        - checkout: self
+          fetchDepth: 1
+
+        # Log in to ECR using your AWS service connection
+        - task: AWSShellScript@1
+          name: EcrLogin
+          displayName: 'Login to Amazon ECR'
+          inputs:
+            awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations'
+            regionName: '$(AWS_REGION)'
+            scriptType: 'bash'
+            inlineScript: |
+              set -euo pipefail
+              aws --version
+              ECR_URI="$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com"
+              echo "ECR_URI=${ECR_URI}"
+
+              # Create repo if missing
+              if ! aws ecr describe-repositories --repository-names "$(ECR_REPOSITORY)" >/dev/null 2>&1; then
+                aws ecr create-repository --repository-name "$(ECR_REPOSITORY)" >/dev/null
+                echo "Created ECR repo: $(ECR_REPOSITORY)"
+              fi
+
+              # ECR login for docker
+              aws ecr get-login-password --region "$(AWS_REGION)" | docker login --username AWS --password-stdin "${ECR_URI}"
+
+              echo "##vso[task.setvariable variable=ECR_URI;issecret=false]${ECR_URI}"
+
+        # Build image
+        - script: |
+            set -euo pipefail
+            echo "Building image from $(DOCKERFILE_PATH) with context $(CONTEXT_PATH)"
+            docker build -f "$(DOCKERFILE_PATH)" -t "$(ECR_REPOSITORY):$(IMAGE_TAG)" "$(CONTEXT_PATH)"
+          displayName: 'Docker build'
+
+        # Tag image for push
+        - script: |
+            set -euo pipefail
+            docker tag "$(ECR_REPOSITORY):$(IMAGE_TAG)" "$(ECR_URI)/$(ECR_REPOSITORY):$(IMAGE_TAG)"
+            docker tag "$(ECR_REPOSITORY):$(IMAGE_TAG)" "$(ECR_URI)/$(ECR_REPOSITORY):$(IMAGE_TAG_LATEST)"
+          displayName: 'Docker tag for ECR'
+          env:
+            ECR_URI: $(ECR_URI)
+
+        # Push to ECR
+        - script: |
+            set -euo pipefail
+            docker push "$(ECR_URI)/$(ECR_REPOSITORY):$(IMAGE_TAG)"
+            docker push "$(ECR_URI)/$(ECR_REPOSITORY):$(IMAGE_TAG_LATEST)"
+          displayName: 'Docker push'
+          env:
+            ECR_URI: $(ECR_URI)
+
+        # Expose the full image URI to next stage
+        - script: |
+            set -euo pipefail
+            echo "##vso[task.setvariable variable=IMAGE_URI;issecret=false]$(ECR_URI)/$(ECR_REPOSITORY):$(IMAGE_TAG)"
+          displayName: 'Publish IMAGE_URI var'
+          env:
+            ECR_URI: $(ECR_URI)
+
+# --- Deploy to Lambda (container image) ---
+- stage: DeployLambda
+  displayName: Deploy Lambda (Container Image)
+  dependsOn: BuildAndPush
+  condition: succeeded()
+  jobs:
+    - job: Deploy
+      displayName: Update/Create Lambda Function
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+        - task: AWSShellScript@1
+          name: DeployLambdaStep
+          displayName: 'aws lambda deploy (image)'
+          inputs:
+            awsCredentials: 'SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations'
+            regionName: '$(AWS_REGION)'
+            scriptType: 'bash'
+            inlineScript: |
+              set -euo pipefail
+
+              IMAGE_URI="$(IMAGE_URI)"
+              echo "Deploying image: ${IMAGE_URI}"
+              echo "Function: $(LAMBDA_FUNCTION_NAME)"
+
+              # Check if function exists
+              if aws lambda get-function --function-name "$(LAMBDA_FUNCTION_NAME)" >/dev/null 2>&1; then
+                echo "Function exists -> updating code to new image"
+                aws lambda update-function-code \
+                  --function-name "$(LAMBDA_FUNCTION_NAME)" \
+                  --image-uri "${IMAGE_URI}" >/dev/null
+
+                echo "Publishing new version"
+                aws lambda publish-version --function-name "$(LAMBDA_FUNCTION_NAME)" >/dev/null
+              else
+                echo "Function not found -> creating"
+                aws lambda create-function \
+                  --function-name "$(LAMBDA_FUNCTION_NAME)" \
+                  --package-type Image \
+                  --code ImageUri="${IMAGE_URI}" \
+                  --role "$(LAMBDA_ROLE_ARN)" \
+                  --region "$(AWS_REGION)" \
+                  --timeout 120 \
+                  --memory-size 1024 \
+                  --architectures x86_64 >/dev/null
+
+                echo "Created function. Publishing initial version."
+                aws lambda publish-version --function-name "$(LAMBDA_FUNCTION_NAME)" >/dev/null
+              fi
+
+              echo "Set '$IMAGE_URI' on '$(LAMBDA_FUNCTION_NAME)'"
