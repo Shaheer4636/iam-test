@@ -1,14 +1,28 @@
+terraform {
+  required_version = ">= 1.3.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = "us-east-1"
 }
 
-# S3 Bucket
+# ---------------------------
+# S3 Bucket for Lambda access
+# ---------------------------
 resource "aws_s3_bucket" "test_bucket" {
   bucket = "test-s3-bucket-for-lambda-access"
   acl    = "private"
 }
 
+# ---------------------------
 # IAM Role for Lambda
+# ---------------------------
 resource "aws_iam_role" "lambda_role" {
   name = "lambda-test-role"
 
@@ -16,8 +30,9 @@ resource "aws_iam_role" "lambda_role" {
     Version = "2012-10-17",
     Statement = [
       {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
+        Sid    = "LambdaAssumeRole"
+        Effect = "Allow"
+        Action = "sts:AssumeRole"
         Principal = {
           Service = "lambda.amazonaws.com"
         }
@@ -26,65 +41,134 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# IAM Policy for full access to S3 and CloudWatch Synthetics
-resource "aws_iam_policy" "lambda_policy" {
+# ----------------------------------------------------------------
+# IAM Policy: S3 full access to THIS bucket; CloudWatch/Logs full *
+# ----------------------------------------------------------------
+resource "aws_iam_policy" "lambda_full_access_policy" {
   name        = "lambda-full-access-policy"
-  description = "Full access to S3 bucket and CloudWatch Synthetics"
+  description = "Full CloudWatch/Logs and full S3 access to the specific bucket"
 
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
+      # S3 full access but scoped to this bucket and its objects
       {
-        Effect = "Allow",
+        Sid    = "S3FullAccessToBucket"
+        Effect = "Allow"
         Action = [
           "s3:*"
-        ],
+        ]
         Resource = [
-          "${aws_s3_bucket.test_bucket.arn}",
+          aws_s3_bucket.test_bucket.arn,
           "${aws_s3_bucket.test_bucket.arn}/*"
         ]
       },
+      # CloudWatch (metrics/alarms) full access
       {
-        Effect = "Allow",
+        Sid    = "CloudWatchFullAccess"
+        Effect = "Allow"
         Action = [
-          "synthetics:*",
-          "cloudwatch:*",
+          "cloudwatch:*"
+        ]
+        Resource = "*"
+      },
+      # CloudWatch Logs full access (create groups/streams, put events, etc.)
+      {
+        Sid    = "CloudWatchLogsFullAccess"
+        Effect = "Allow"
+        Action = [
           "logs:*"
-        ],
+        ]
+        Resource = "*"
+      },
+      # (Optional) Synthetics full access — keep if your Lambda needs it
+      {
+        Sid    = "SyntheticsFullAccess"
+        Effect = "Allow"
+        Action = [
+          "synthetics:*"
+        ]
         Resource = "*"
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
+# Attach the custom policy to the role
+resource "aws_iam_role_policy_attachment" "lambda_full_access_attach" {
   role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.lambda_policy.arn
+  policy_arn = aws_iam_policy.lambda_full_access_policy.arn
 }
 
-# Package Lambda function with dependencies
+# You can also attach the AWS managed basic logging policy (harmless redundancy)
+resource "aws_iam_role_policy_attachment" "lambda_basic_logs" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
 
-
-
+# ---------------------------
+# Package Lambda with deps
+# ---------------------------
+# Expects lambda_function.py and requirements.txt in the module folder.
 resource "null_resource" "package_lambda" {
   provisioner "local-exec" {
-    command = "rm -rf lambda_build lambda_function.zip && mkdir lambda_build && cp lambda_function.py lambda_build/ && pip install -r requirements.txt -t lambda_build/ && cd lambda_build && zip -r ../lambda_function.zip ."
+    command = <<-EOC
+      set -e
+      rm -rf lambda_build lambda_function.zip
+      mkdir lambda_build
+      cp lambda_function.py lambda_build/
+      if [ -f requirements.txt ]; then pip install -r requirements.txt -t lambda_build/; fi
+      (cd lambda_build && zip -r ../lambda_function.zip .)
+    EOC
+    interpreter = ["/bin/bash", "-c"]
   }
 
   triggers = {
-    always_run = "${timestamp()}"
+    # Repackage when code, deps, or this timestamp changes
+    always_run = timestamp()
   }
 }
 
+# Keep Terraform aware of code changes to trigger updates
+data "external" "zip_hash" {
+  program = ["bash", "-lc", "echo \"{\\\"hash\\\": \\\"$(openssl dgst -sha256 -binary lambda_function.zip | openssl base64 -A)\\\"}\""]
+  depends_on = [null_resource.package_lambda]
+}
 
+# ---------------------------
 # Lambda Function
+# ---------------------------
 resource "aws_lambda_function" "test_lambda" {
   function_name = "test-lambda-function"
-  role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
-  runtime       = "python3.9"
-  filename      = "${path.module}/lambda_function.zip"
-  
+
+  role    = aws_iam_role.lambda_role.arn
+  handler = "lambda_function.lambda_handler"
+  runtime = "python3.9" # keep as-is; change to 3.12 if your code supports it
+
+  filename         = "${path.module}/lambda_function.zip"
+  source_code_hash = data.external.zip_hash.result.hash
+
+  # Environment example (optional)
+  # environment {
+  #   variables = {
+  #     BUCKET = aws_s3_bucket.test_bucket.bucket
+  #   }
+  # }
 
   depends_on = [null_resource.package_lambda]
+}
+
+# ---------------------------
+# Helpful Outputs
+# ---------------------------
+output "lambda_role_arn" {
+  value = aws_iam_role.lambda_role.arn
+}
+
+output "lambda_function_name" {
+  value = aws_lambda_function.test_lambda.function_name
+}
+
+output "bucket_name" {
+  value = aws_s3_bucket.test_bucket.bucket
 }
