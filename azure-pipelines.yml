@@ -1,11 +1,132 @@
-{
-  "version": "0",
-  "id": "00000000-1111-2222-3333-444444444444",
-  "detail-type": "Scheduled Event",
-  "source": "aws.events",
-  "account": "123456789012",
-  "time": "2025-10-08T06:00:00Z",
-  "region": "us-east-1",
-  "resources": ["arn:aws:events:us-east-1:123456789012:rule/run-uptime-report"],
-  "detail": {}
-}
+import os, json, boto3, pdfkit
+from datetime import datetime
+from botocore.exceptions import ClientError
+
+# =========================
+# HARD-CODED CONFIG
+# =========================
+CANARY       = "citi-sit"
+SRC_BUCKET   = "test-s3-bucket-for-lambda-access"  # where HTML is read from
+DEST_BUCKET  = "lambda-bucket-ouput-0009"          # where PDF (and a copy of HTML) is written
+BASE_PREFIX  = f"uptime/{CANARY}"                  # folder prefix in both buckets
+PDF_FORMAT   = "A4"
+JS_DELAY_MS  = 5000
+
+# Try common wkhtmltopdf paths (container/layer vs apt path). First existing wins.
+_CANDIDATE_WKHTML = ["/opt/bin/wkhtmltopdf", "/usr/bin/wkhtmltopdf"]
+for _p in _CANDIDATE_WKHTML:
+    if os.path.exists(_p):
+        WKHTMLTOPDF_BIN = _p
+        break
+else:
+    # Fallback (will error out later if missing)
+    WKHTMLTOPDF_BIN = "/usr/bin/wkhtmltopdf"
+
+# Lambda runtime safeties
+os.environ.setdefault("HOME", "/tmp")
+os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
+os.environ.setdefault("FONTCONFIG_PATH", "/etc/fonts")
+
+s3 = boto3.client("s3")
+
+
+def _ym(event: dict):
+    now = datetime.utcnow()
+    y = str(event.get("year")  or now.year).zfill(4)
+    m = str(event.get("month") or now.month).zfill(2)
+    return y, m
+
+
+def _key(y, m, name):
+    return f"{BASE_PREFIX}/{y}/{m}/{name}".lstrip("/")
+
+
+def lambda_handler(event, context=None):
+    """
+    Event (all optional):
+      - year, month: integers/strings for foldering
+      - html_key: full S3 key to read HTML from (SRC_BUCKET). If omitted, uses uptime/citi-sit/YYYY/MM/uptime-report.html
+      - pdf_key : full S3 key to write PDF to (DEST_BUCKET). If omitted, uses uptime/citi-sit/YYYY/MM/uptime-report.pdf
+    """
+    event = event or {}
+    year, month = _ym(event)
+
+    html_key = event.get("html_key") or _key(year, month, "uptime-report.html")
+    pdf_key  = event.get("pdf_key")  or _key(year, month, "uptime-report.pdf")
+
+    # 1) fetch HTML
+    try:
+        obj = s3.get_object(Bucket=SRC_BUCKET, Key=html_key)
+        html = obj["Body"].read().decode("utf-8", errors="ignore")
+    except ClientError as e:
+        return {
+            "statusCode": 404,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({
+                "error": f"Missing {SRC_BUCKET}/{html_key}",
+                "detail": str(e)
+            })
+        }
+
+    # 2) copy HTML to DEST (best-effort for debugging/traceability)
+    try:
+        s3.copy_object(
+            CopySource={"Bucket": SRC_BUCKET, "Key": html_key},
+            Bucket=DEST_BUCKET,
+            Key=html_key,
+            MetadataDirective="REPLACE",
+            ContentType="text/html; charset=utf-8"
+        )
+    except ClientError:
+        pass
+
+    # 3) render to PDF with wkhtmltopdf
+    config = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_BIN)
+    options = {
+        "page-size": PDF_FORMAT,
+        "print-media-type": None,
+        "enable-local-file-access": None,
+        "encoding": "UTF-8",
+        "margin-top": "0mm",
+        "margin-right": "0mm",
+        "margin-bottom": "0mm",
+        "margin-left": "0mm",
+        # allow time for charts/JS to paint
+        "javascript-delay": str(JS_DELAY_MS),
+        # If your HTML sets window.status='done' once charts finish, uncomment:
+        # "window-status": "done",
+        # "no-stop-slow-scripts": None,
+    }
+
+    try:
+        pdf_bytes = pdfkit.from_string(html, False, options=options, configuration=config)
+    except OSError as e:
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"error": f"wkhtmltopdf error: {e}", "bin": WKHTMLTOPDF_BIN})
+        }
+
+    # 4) upload PDF
+    s3.put_object(
+        Bucket=DEST_BUCKET,
+        Key=pdf_key,
+        Body=pdf_bytes,
+        ContentType="application/pdf",
+    )
+
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({
+                "src_bucket": SRC_BUCKET,
+                "dest_bucket": DEST_BUCKET,
+                "prefix": f"{BASE_PREFIX}/{year}/{month}/",
+                "html_key": html_key,
+                "dest_html_key": html_key,
+                "dest_pdf_key": pdf_key,
+                "js_delay_ms": JS_DELAY_MS,
+                "format": PDF_FORMAT,
+                "wkhtmltopdf_bin": WKHTMLTOPDF_BIN
+        })
+    }
