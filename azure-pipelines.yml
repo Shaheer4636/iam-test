@@ -16,6 +16,11 @@ resources:
       type: git 
       name: DEVOPS_Platform_as_a_Service/iam-controls
       ref: refs/tags/2.16.0
+    - repository: AWS-ECR
+      type: git 
+      name: DEVOPS_Platform_as_a_Service/AWS-ECR
+      ref: refs/tags/2.16.0
+    
 
 trigger: none
 
