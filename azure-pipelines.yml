@@ -1,54 +1,32 @@
-# ------------------------------------------------------------
-# Azure DevOps: Infra only (template stage)
-# ------------------------------------------------------------
 
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-    - repository: iam-controls
-      type: git 
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.16.0
-    - repository: AWS-ECR
-      type: git 
-      name: DEVOPS_Platform_as_a_Service/AWS-ECR
-      ref: refs/tags/2.16.0
+│   on main.tf line 125, in resource "aws_iam_policy" "canary_full_access":
+│  125: resource "aws_iam_policy" "canary_full_access" {
+│ 
+╵
+╷
+│ Error: creating IAM Role (samc-obs-sandbox-lambdafunction-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: e7735f17-a70a-4975-9de6-2ac3658eedb7, EntityAlreadyExists: Role with name samc-obs-sandbox-lambdafunction-role already exists.
+│ 
+│   with aws_iam_role.lambdafunction_role,
+│   on main.tf line 162, in resource "aws_iam_role" "lambdafunction_role":
+│  162: resource "aws_iam_role" "lambdafunction_role" {
+│ 
+╵
+╷
+│ Error: creating IAM Policy (samc-obs-sandbox-lambdafunction-fullaccess): operation error IAM: CreatePolicy, https response error StatusCode: 409, RequestID: 085b10bb-7e30-4fff-bc33-04c55509ffe7, EntityAlreadyExists: A policy called samc-obs-sandbox-lambdafunction-fullaccess already exists. Duplicate names are not allowed.
+│ 
+│   with aws_iam_policy.lambdafunction_full_access,
+│   on main.tf line 180, in resource "aws_iam_policy" "lambdafunction_full_access":
+│  180: resource "aws_iam_policy" "lambdafunction_full_access" {
+│ 
+╵
+╷
+│ Error: creating ECR Repository (client-uptime-lambda): operation error ECR: CreateRepository, https response error StatusCode: 400, RequestID: e823fcfd-fefe-4bc6-bc56-733287befaec, api error AccessDeniedException: User: arn:aws:iam::492046385895:user/DEVOPSIACSVCVPC is not authorized to perform: ecr:CreateRepository on resource: arn:aws:ecr:***:492046385895:repository/client-uptime-lambda because no identity-based policy allows the ecr:CreateRepository action
+│ 
+│   with aws_ecr_repository.client_uptime_lambda,
+│   on main.tf line 234, in resource "aws_ecr_repository" "client_uptime_lambda":
+│  234: resource "aws_ecr_repository" "client_uptime_lambda" {
+│ 
+╵
 
-trigger: none
-
-parameters:
-- name: sandbox
-  displayName: Deploy S3 to SAMC
-  type: boolean
-  default: true
-
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
-
-variables:
-  AWS_REGION: 'us-east-1'
-
-stages:
-# --- Your existing infra/template stage ---
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    reqS3Mod: true
-    application: ClientUptime
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: $(AWS_REGION)
-    checkoutTemplate: gitCheckouts.yml
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.13.3/x64/terraform' failed with exit code 1
+Finishing: Terraform Apply - TACSyV5
