@@ -1,117 +1,150 @@
-# azure-pipelines.yml  — Terraform (IAM only) with S3 backend
-trigger: none
+terraform {
+  required_version = ">= 1.3.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
 
-# ---------- RUN-TIME PARAMETERS ----------
-parameters:
-- name: tfPlanOnly
-  displayName: Terraform plan only (no apply)
-  type: boolean
-  default: true
-- name: regionName
-  displayName: AWS region
-  type: string
-  default: 'us-east-1'
-- name: useS3Backend
-  displayName: Use S3 backend for Terraform state
-  type: boolean
-  default: true
-- name: s3Bucket
-  displayName: S3 bucket for TF state
-  type: string
-  default: 'samc-obs-tfstate'  # <-- EDIT to your bucket
-- name: s3Key
-  displayName: S3 key (path) for TF state
-  type: string
-  default: 'iam-only/sandbox/terraform.tfstate'  # <-- EDIT if you want
-- name: dynamoTable
-  displayName: DynamoDB table for TF state lock
-  type: string
-  default: 'samc-obs-tflock'  # <-- EDIT to your table
+provider "aws" {
+  region = var.region
+}
 
-# ---------- PIPELINE VARIABLES ----------
-variables:
-  # CHANGE THIS TO MATCH THE EXACT SERVICE CONNECTION NAME IN THIS PROJECT
-  AWS_SC_REGIONAL: 'SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations'
+# -----------------------------
+# Role: <name_prefix>-<env>-canary-role
+# Canary needs S3 + CloudWatch/Logs full access
+# -----------------------------
+resource "aws_iam_role" "canary_role" {
+  name = "${var.name_prefix}-${var.env}-canary-role"
 
-pool:
-  vmImage: ubuntu-latest
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "SyntheticsAssumeRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Principal = {
+          Service = "synthetics.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
 
-steps:
-- checkout: self
+resource "aws_iam_policy" "canary_full_access" {
+  name        = "${var.name_prefix}-${var.env}-canary-fullaccess"
+  description = "Full S3 and CloudWatch/Logs for CloudWatch Synthetics canaries"
 
-# Install a pinned Terraform version
-- script: |
-    set -e
-    curl -sLo tf.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-    unzip -o tf.zip
-    sudo mv terraform /usr/local/bin/terraform
-    terraform -version
-  displayName: Install Terraform 1.6.6
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid: "S3Full",
+        Effect: "Allow",
+        Action: ["s3:*"],
+        Resource: ["*"]
+      },
+      {
+        Sid: "CloudWatchFull",
+        Effect: "Allow",
+        Action: ["cloudwatch:*"],
+        Resource: ["*"]
+      },
+      {
+        Sid: "LogsFull",
+        Effect: "Allow",
+        Action: ["logs:*"],
+        Resource: ["*"]
+      }
+    ]
+  })
+}
 
-# Create backend.hcl only when using S3 backend (this is your "terra connection string")
-- ${{ if eq(parameters.useS3Backend, true) }}:
-  - script: |
-      cat > backend.hcl <<'EOF'
-      bucket         = "${{ parameters.s3Bucket }}"
-      key            = "${{ parameters.s3Key }}"
-      region         = "${{ parameters.regionName }}"
-      dynamodb_table = "${{ parameters.dynamoTable }}"
-      encrypt        = true
-      EOF
-      echo "Wrote backend.hcl:"
-      cat backend.hcl
-    displayName: Write backend.hcl (S3 state)
+resource "aws_iam_role_policy_attachment" "canary_attach" {
+  role       = aws_iam_role.canary_role.name
+  policy_arn = aws_iam_policy.canary_full_access.arn
+}
 
-# Plan (verbose + time-boxed)
-- task: AWSShellScript@1
-  displayName: Terraform init + plan (verbose)
-  timeoutInMinutes: 20
-  env:
-    TF_LOG: INFO
-    TF_LOG_PATH: $(Build.SourcesDirectory)/terraform.log
-    TF_PLUGIN_CACHE_DIR: $(Pipeline.Workspace)/.tfcache
-    USE_S3: ${{ parameters.useS3Backend }}
-  inputs:
-    awsCredentials: '$(AWS_SC_REGIONAL)'
-    regionName: '${{ parameters.regionName }}'
-    scriptType: 'bash'
-    inlineScript: |
-      set -euxo pipefail
-      echo "== whoami ==" && whoami
-      echo "== ls ==" && ls -la
+# -----------------------------
+# Role: <name_prefix>-<env>-lambda-role
+# Lambda needs S3 + ECR + CloudWatch/Logs full access
+# -----------------------------
+resource "aws_iam_role" "lambda_role" {
+  name = "${var.name_prefix}-${var.env}-lambda-role"
 
-      echo "== network probes =="
-      curl -sSfI https://registry.terraform.io/v1/providers/hashicorp/aws/versions || echo "registry.terraform.io unreachable"
-      curl -sSfI https://releases.hashicorp.com/terraform-provider-aws/ || echo "releases.hashicorp.com unreachable"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid      = "LambdaAssumeRole"
+        Effect   = "Allow"
+        Action   = "sts:AssumeRole"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
 
-      echo "== terraform init =="
-      if [ "${USE_S3,,}" = "true" ]; then
-        timeout 600 terraform init -input=false -upgrade -no-color -backend-config=backend.hcl
-      else
-        timeout 600 terraform init -input=false -upgrade -no-color
-      fi
+resource "aws_iam_policy" "lambda_full_access" {
+  name        = "${var.name_prefix}-${var.env}-lambda-fullaccess"
+  description = "Full S3, ECR, and CloudWatch/Logs for Lambda functions"
 
-      echo "== terraform validate =="
-      terraform validate -no-color
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid: "S3Full",
+        Effect: "Allow",
+        Action: ["s3:*"],
+        Resource: ["*"]
+      },
+      {
+        Sid: "ECRFull",
+        Effect: "Allow",
+        Action: [
+          "ecr:*",
+          "ecr-public:*",
+          "sts:GetServiceBearerToken",           # for ECR Public
+          "ecr:GetAuthorizationToken"            # requires "*"
+        ],
+        Resource: ["*"]
+      },
+      {
+        Sid: "CloudWatchFull",
+        Effect: "Allow",
+        Action: ["cloudwatch:*"],
+        Resource: ["*"]
+      },
+      {
+        Sid: "LogsFull",
+        Effect: "Allow",
+        Action: ["logs:*"],
+        Resource: ["*"]
+      }
+    ]
+  })
+}
 
-      echo "== terraform plan =="
-      timeout 600 terraform plan -input=false -no-color -var-file vars/sandbox.tfvars -out tf.plan
+resource "aws_iam_role_policy_attachment" "lambda_attach" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_full_access.arn
+}
 
-# Publish artifacts (plan + log)
-- publish: tf.plan
-  artifact: tfplan
-- publish: $(Build.SourcesDirectory)/terraform.log
-  artifact: tflog
+# Optional but useful for Lambda basic logging bootstrap
+resource "aws_iam_role_policy_attachment" "lambda_basic_logs" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
 
-# Apply only if tfPlanOnly = false
-- ${{ if not(parameters.tfPlanOnly) }}:
-  - task: AWSShellScript@1
-    displayName: Terraform apply
-    timeoutInMinutes: 20
-    inputs:
-      awsCredentials: '$(AWS_SC_REGIONAL)'
-      regionName: '${{ parameters.regionName }}'
-      scriptType: 'bash'
-      inlineScript: |
-        set -euxo pipefail
-        terraform apply -input=false -auto-approve tf.plan
+# -----------------------------
+# Outputs
+# -----------------------------
+output "canary_role_name" { value = aws_iam_role.canary_role.name }
+output "canary_role_arn"  { value = aws_iam_role.canary_role.arn  }
+output "lambda_role_name" { value = aws_iam_role.lambda_role.name }
+output "lambda_role_arn"  { value = aws_iam_role.lambda_role.arn  }
