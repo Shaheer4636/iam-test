@@ -1,83 +1,32 @@
-# ------------------------------------------------------------
-# Azure DevOps: Build Docker image only (no ECR login/push, no Lambda deploy)
-# ------------------------------------------------------------
+variable "ecr_tags" {
+  description = "A mapping of tags to assign to all resources"
+  type        = map(string)
+  default     = {}
+}
 
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-    - repository: iam-controls
-      type: git 
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.16.0
+variable "ecr_name" {
+  description = "Defines the name of the ECR repository."
+  type        = string
+  validation {
+    condition     = can(regex("^[a-z0-9_-]+$", var.ecr_name))
+    error_message = "The  variable must contain only lower cases, numbers, underscore, hyphens"
+  }
+}
 
-trigger: none
+variable "lifecycle_policy" {
+  description = "Lifecycle policy to be applied on private ecr repository"
+  type        = map(any)
+  default     = null
 
-parameters:
-- name: sandbox
-  displayName: Deploy S3 to SAMC
-  type: boolean
-  default: true
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
+}
 
-variables:
-  IMAGE_NAME: 'client-uptime-lambda'
-  IMAGE_TAG: '$(Build.BuildId)'
-  DOCKERFILE_PATH: 'Dockerfile'
-  CONTEXT_PATH: '.'
+variable "image_tag_mutability" {
+  type        = string
+  description = "Defines whether image tags must be mutable or immutable"
+  default     = "MUTABLE"
+  validation {
+    condition     = contains(["MUTABLE", "IMMUTABLE"], var.image_tag_mutability)
+    error_message = "Value should be either MUTABLE or IMMUTABLE."
+  }
 
-stages:
-# --- Existing infra/template stage (unchanged) ---
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    reqS3Mod: true
-    application: ClientUptime
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-    checkoutTemplate: gitCheckouts.yml
-
-# --- Build image locally and publish as artifact (no ECR steps) ---
-- stage: BuildImage
-  displayName: Build Docker Image
-  dependsOn: []
-  jobs:
-    - job: Build
-      displayName: Docker Build (no push)
-      pool:
-        vmImage: 'ubuntu-latest'
-      steps:
-        - checkout: self
-          fetchDepth: 1
-
-        - script: |
-            set -euo pipefail
-            echo "Building image ${IMAGE_NAME}:${IMAGE_TAG} from ${DOCKERFILE_PATH}"
-            docker build -f "${DOCKERFILE_PATH}" -t "${IMAGE_NAME}:${IMAGE_TAG}" "${CONTEXT_PATH}"
-          displayName: 'Docker build'
-
-        # Optional: export the image as a tarball so other jobs can consume it
-        - script: |
-            set -euo pipefail
-            mkdir -p $(Build.ArtifactStagingDirectory)
-            docker save "${IMAGE_NAME}:${IMAGE_TAG}" -o "$(Build.ArtifactStagingDirectory)/${IMAGE_NAME}-${IMAGE_TAG}.tar"
-            echo "Saved image to $(Build.ArtifactStagingDirectory)/${IMAGE_NAME}-${IMAGE_TAG}.tar"
-          displayName: 'Save image as tarball'
-
-        - publish: $(Build.ArtifactStagingDirectory)
-          artifact: docker-image
-          displayName: 'Publish image artifact'
+}
