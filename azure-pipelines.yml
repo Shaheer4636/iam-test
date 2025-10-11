@@ -1,86 +1,13 @@
-# ecr/deploy-ecr.yml
+# # PROMERIT DEMO SIT
+module "canary-promerit-demo-sit" {
+#   source         = "../synthetic-canary-alarm"
+#   appname        = var.appname
+#   env            = var.env
+#   region         = var.region
+#   monitoring_url = "https://demo-promerit-sit.situsamc.com/MBMSWebClient_deploy/mvc/Homepage.aspx"
+#   canary_name    = "demo-promerit-sit"
 
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
-    - repository: AWS-ECR
-      type: git
-      name: DEVOPS_Platform_as_a_Service/AWS-ECR
-      ref: refs/tags/1.0.0
-    - repository: iam-controls
-      type: git
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.16.0
-
-trigger: none
-
-parameters:
-- name: sandbox
-  displayName: Deploy ECR to SAMC
-  type: boolean
-  default: true
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
-
-stages:
-# NEW: create clean copies that the template’s grep will always find
-- stage: NormalizeTfvars
-  displayName: Normalize tfvars (paths + LF + exact appname line)
-  jobs:
-  - job: WriteTfvars
-    steps:
-    - checkout: self
-    - script: |
-        set -euo pipefail
-
-        # Ensure both directories exist
-        mkdir -p vars
-        mkdir -p ecr/vars
-
-        # Write identical, LF-only files with exact spacing the check expects
-        # (no BOM, no tabs, one space around '=')
-        cat > vars/sandbox.tfvars <<'EOF'
-ecr_tags = {}
-image_tag_mutability = "MUTABLE"
-ecr_name = "test-container"
-lifecycle_policy = null
-env = "sandbox"
-region = "us-east-1"
-appname = "ClientUptime"
-EOF
-
-        cp -f vars/sandbox.tfvars ecr/vars/sandbox.tfvars
-
-        # Strip any stray CR characters defensively
-        perl -0777 -pe 's/\r\n/\n/g' -i vars/sandbox.tfvars ecr/vars/sandbox.tfvars
-
-        echo "Preview vars/sandbox.tfvars:"
-        nl -ba vars/sandbox.tfvars
-        echo "Preview ecr/vars/sandbox.tfvars:"
-        nl -ba ecr/vars/sandbox.tfvars
-
-        echo "Grepping for exact line:"
-        grep -n '^appname = "ClientUptime"$' vars/sandbox.tfvars
-        grep -n '^appname = "ClientUptime"$' ecr/vars/sandbox.tfvars
-      displayName: Create clean tfvars at both probe paths
-
-# Call the shared template exactly as before
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-    reqS3Mod: false
-    application: ClientUptime
-    pipelineSrcDir: ecr
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-    checkoutTemplate: ecr/gitCheckouts.yml
-    checkoutTemplateRepo: self
+#   critical_notification_sns = module.sns-subtopic.critical_notification_sns
+#   high_notification_sns     = module.sns-subtopic.high_notification_sns
+#   medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+# }
