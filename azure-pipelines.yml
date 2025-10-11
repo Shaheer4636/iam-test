@@ -1,7 +1,28 @@
-ecr_tags             = {}
-image_tag_mutability = "MUTABLE"
-ecr_name             = "test-container"
-lifecycle_policy     = null
-env                  = "sandbox"
-region               = "us-east-1"
-appname              = "ClientUptime"
+Check appname from tfvars file matches application name from pipeline YML - Toy5x2
+
+View raw log
+
+Starting: Check appname from tfvars file matches application name from pipeline YML - Toy5x2
+==============================================================================
+Task         : Bash
+Description  : Run a Bash script on macOS, Linux, or Windows
+Version      : 3.259.0
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/bash
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+/usr/bin/bash /ADOagent/_work/_temp/ecc40d54-2199-440e-81f3-56fa5cdd7869.sh
+grep: ecr/vars/sandbox.tfvars: No such file or directory
+appname is  from vars/sandbox.tfvars
+application is ClientUptime from pipeline YML
+##[error]ERROR: ClientUptime was NOT found in vars/sandbox.tfvars
+##[error]ERROR:  is NOT equal to ClientUptime
+##[error]CAUTION: Be certain to make a backup copy of your Terraform tfstate file before changing application in YML file.
+
+##[error]Bash exited with code '1'.
+##[error]Bash wrote one or more lines to the standard error stream.
+##[error]grep: 
+##[error]ecr/vars/sandbox.tfvars
+##[error]: No such file or directory
+##[error]
