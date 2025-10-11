@@ -5,11 +5,13 @@ resources:
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/7.7.0
 
+    # must be aliased exactly as 'AWS-ECR'
     - repository: AWS-ECR
       type: git
       name: DEVOPS_Platform_as_a_Service/AWS-ECR
       ref: refs/tags/1.0.0
 
+    # declare because gitCheckouts.yml checks it out
     - repository: iam-controls
       type: git
       name: DEVOPS_Platform_as_a_Service/iam-controls
@@ -28,31 +30,16 @@ parameters:
   default: false
 
 stages:
-- stage: Prepare
-  displayName: Prepare checkouts
-  jobs:
-  - job: CheckoutRepos
-    steps:
-    - checkout: self
-      displayName: Get self
-    - checkout: AWS-ECR
-      displayName: Get AWS-ECR
-    - checkout: iam-controls
-      displayName: Get iam-controls
-
-# Call your deploy template after repos are checked out
-- stage: Deploy
-  jobs:
-  - template: deploy/tf-create-infra-template.yml@templates
-    parameters:
-      environment: sandbox
-      environmentDisplayName: sandbox
-      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-      tfVersion: 1.13.3
-      reqS3Mod: false                # ECR-only
-      application: ClientUptime
-      pipelineSrcDir: $(Build.Repository.Name)
-      tfPlanOnly: ${{ parameters.terrformPLANonly }}
-      regionName: us-east-1
-      checkoutTemplate: gitCheckouts.yml
+- template: deploy/tf-create-infra-template.yml@templates
+  parameters:
+    environment: sandbox
+    environmentDisplayName: sandbox
+    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+    tfVersion: 1.13.3
+    reqS3Mod: false                 # ECR-only; keep S3 off
+    application: ClientUptime
+    pipelineSrcDir: $(Build.Repository.Name)
+    tfPlanOnly: ${{ parameters.terrformPLANonly }}
+    regionName: us-east-1
+    checkoutTemplate: gitCheckouts.yml
