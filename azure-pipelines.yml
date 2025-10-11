@@ -1,54 +1,5 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/7.7.0
+steps:
+- checkout: AWS-ECR
+  displayName: Get AWS-ECR
 
-    # ECR module repo — alias must be AWS-ECR
-    - repository: AWS-ECR
-      type: git
-      name: DEVOPS_Platform_as_a_Service/AWS-ECR
-      ref: refs/tags/1.0.0
 
-    # Declare because the template checks it out; harmless if unused
-    - repository: iam-controls
-      type: git
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.16.0
-
-trigger: none
-
-parameters:
-- name: sandbox
-  displayName: Deploy ECR to SAMC
-  type: boolean
-  default: true
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: false
-
-stages:
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-
-    # You’re only deploying ECR — do NOT request S3
-    reqS3Mod: false
-
-    application: ClientUptime
-    pipelineSrcDir: $(Build.Repository.Name)
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-
-    # If the template uses a checkout list param, pass the exact aliases:
-    additionalReposToCheckout:
-      - AWS-ECR
-      - iam-controls
-
-    checkoutTemplate: gitCheckouts.yml
