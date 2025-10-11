@@ -4,27 +4,22 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/6.45.0
-
     - repository: synthetic-canary-alarm
       type: git
       name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
       ref: refs/tags/2.2.0
-
     - repository: sns-subtopic
       type: git
       name: DEVOPS_Platform_as_a_Service/sns-subtopic
       ref: refs/tags/1.0.0
-
     - repository: iam-controls
       type: git
       name: DEVOPS_Platform_as_a_Service/iam-controls
       ref: refs/tags/2.27.0
-
     - repository: alarm-aggregator
       type: git
       name: DEVOPS_Platform_as_a_Service/alarm-aggregator
       ref: refs/tags/2.0.2
-
     - repository: s3
       type: git
       name: DEVOPS_Platform_as_a_Service/s3
@@ -38,20 +33,26 @@ parameters:
     displayName: Deploy DEMO canary to SAMC Observability Account
     type: boolean
     default: false
-
-  # fixed the typo: terrformPLANonly -> terraformPlanOnly
   - name: terraformPlanOnly
     displayName: tfPlanOnly (check == true)
     type: boolean
     default: true
 
 stages:
+  # Always-present no-op so the pipeline has at least one stage
+  - stage: Start
+    displayName: Startup / Parameter Gate
+    jobs:
+      - job: NoOp
+        steps:
+          - script: echo "Set 'Sandbox' to true to run the deploy stage."
+
+  # Deploy stage only included when Sandbox=true
   - ${{ if eq(parameters.Sandbox, true) }}:
     - template: deploy/tf-create-infra-template.yml@templates
       parameters:
         environment: sandbox
         environmentDisplayName: Sandbox
-        # quote names with spaces and dashes
         tfServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations"
         awsServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
         tfVersion: "1.9.8"
@@ -59,6 +60,5 @@ stages:
         pipelineSrcDir: $(Build.Repository.Name)
         tfPlanOnly: ${{ parameters.terraformPlanOnly }}
         regionName: us-east-1
-        # this file lives in this repo (self)
         checkoutTemplate: synthetic-canaries-checkouts.yml
         reqS3Mod: true
