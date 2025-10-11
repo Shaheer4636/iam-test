@@ -1,3 +1,6 @@
+# ecr/deploy-ecr.yml
+# Uses the shared deploy template, but the checkout steps come from ecr/gitCheckouts.yml in THIS repo.
+
 resources:
   repositories:
     - repository: templates
@@ -5,13 +8,13 @@ resources:
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/7.7.0
 
-    # must be aliased exactly as 'AWS-ECR'
+    # ECR module repo — alias must be AWS-ECR (used by gitCheckouts.yml)
     - repository: AWS-ECR
       type: git
       name: DEVOPS_Platform_as_a_Service/AWS-ECR
       ref: refs/tags/1.0.0
 
-    # declare because gitCheckouts.yml checks it out
+    # Declared because the shared jobs often expect it; harmless to checkout
     - repository: iam-controls
       type: git
       name: DEVOPS_Platform_as_a_Service/iam-controls
@@ -37,9 +40,11 @@ stages:
     tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
     awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
     tfVersion: 1.13.3
-    reqS3Mod: false                 # ECR-only; keep S3 off
+    reqS3Mod: false                     # ECR-only
     application: ClientUptime
-    pipelineSrcDir: $(Build.Repository.Name)
+    pipelineSrcDir: ecr                 # run Terraform from the ecr/ folder
     tfPlanOnly: ${{ parameters.terrformPLANonly }}
     regionName: us-east-1
-    checkoutTemplate: gitCheckouts.yml
+
+    # IMPORTANT: use the checkout file in YOUR repo (qualify with @self and include the subfolder)
+    checkoutTemplate: ecr/gitCheckouts.yml@self
