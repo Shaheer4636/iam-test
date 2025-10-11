@@ -1,9 +1,73 @@
-steps:
-- checkout: self
-  displayName: Get pipeline repo
+# ecr/deploy-ecr.yml
 
-- checkout: AWS-ECR
-  displayName: Get ECR module - SAMC
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/7.7.0
 
-- checkout: iam-controls
-  displayName: Get iam-controls module - SAMC
+    - repository: AWS-ECR
+      type: git
+      name: DEVOPS_Platform_as_a_Service/AWS-ECR
+      ref: refs/tags/1.0.0
+
+    - repository: iam-controls
+      type: git
+      name: DEVOPS_Platform_as_a_Service/iam-controls
+      ref: refs/tags/2.16.0
+
+trigger: none
+
+parameters:
+- name: sandbox
+  displayName: Deploy ECR to SAMC
+  type: boolean
+  default: true
+- name: terrformPLANonly
+  displayName: tfPlanOnly (check == true)
+  type: boolean
+  default: false
+
+stages:
+# Prepare both tfvars paths so the shared script can find it in either place
+- stage: PreparePaths
+  displayName: Prepare tfvars paths
+  jobs:
+  - job: MirrorTfvars
+    displayName: Mirror sandbox.tfvars to repo root path
+    steps:
+    - checkout: self
+    - script: |
+        set -euo pipefail
+        if [ -f ecr/vars/sandbox.tfvars ]; then
+          mkdir -p vars
+          cp -f ecr/vars/sandbox.tfvars vars/sandbox.tfvars
+          echo "Copied ecr/vars/sandbox.tfvars -> vars/sandbox.tfvars"
+          echo "Preview:"
+          grep -n 'appname' ecr/vars/sandbox.tfvars || true
+          grep -n 'appname' vars/sandbox.tfvars || true
+        else
+          echo "ERROR: ecr/vars/sandbox.tfvars not found"; exit 1
+        fi
+      displayName: Ensure tfvars exists at both expected locations
+
+# Call the shared deploy template (Terraform runs from ecr/)
+- template: deploy/tf-create-infra-template.yml@templates
+  parameters:
+    environment: sandbox
+    environmentDisplayName: sandbox
+
+    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+    tfVersion: 1.13.3
+
+    reqS3Mod: false
+    application: ClientUptime
+    pipelineSrcDir: ecr
+    tfPlanOnly: ${{ parameters.terrformPLANonly }}
+    regionName: us-east-1
+
+    # Use your checkout file from THIS repo
+    checkoutTemplate: ecr/gitCheckouts.yml
+    checkoutTemplateRepo: self
