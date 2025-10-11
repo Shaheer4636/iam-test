@@ -1,4 +1,68 @@
-# ecr/deploy-ecr.yml
+│ Warning: Value for undeclared variable
+│ 
+│ The root module does not declare a variable named "appname" but a value was
+│ found in file "vars/sandbox.tfvars". If you meant to use this value, add a
+│ "variable" block to the configuration.
+│ 
+│ To silence these warnings, use TF_VAR_... environment variables to provide
+│ certain "global" settings to all configurations in your organization. To
+│ reduce the verbosity of these warnings, use the -compact-warnings option.
+╵
+╷
+│ Warning: Value for undeclared variable
+│ 
+│ The root module does not declare a variable named "ecr_name" but a value
+│ was found in file "vars/sandbox.tfvars". If you meant to use this value,
+│ add a "variable" block to the configuration.
+│ 
+│ To silence these warnings, use TF_VAR_... environment variables to provide
+│ certain "global" settings to all configurations in your organization. To
+│ reduce the verbosity of these warnings, use the -compact-warnings option.
+╵
+╷
+│ Warning: Values for undeclared variables
+│ 
+│ In addition to the other similar warnings shown, 5 other variable(s)
+│ defined without being declared.
+╵
+╷
+│ Error: reading ECR Repository (client-uptime-lambda): operation error ECR: DescribeRepositories, https response error StatusCode: 400, RequestID: ac81b176-448e-4fa2-8ab9-8e54760a49c2, api error AccessDeniedException: User: arn:aws:iam::492046385895:user/DEVOPSIACSVCVPC is not authorized to perform: ecr:DescribeRepositories on resource: arn:aws:ecr:***:492046385895:repository/client-uptime-lambda because no identity-based policy allows the ecr:DescribeRepositories action
+│ 
+│ 
+╵
+
+##[warning]Can't find loc string for key: TerraformPlanFailed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 resources:
   repositories:
@@ -6,46 +70,37 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/7.7.0
-
     - repository: AWS-ECR
       type: git
       name: DEVOPS_Platform_as_a_Service/AWS-ECR
       ref: refs/tags/1.0.0
-
     - repository: iam-controls
       type: git
       name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.16.0
+      ref: refs/tags/3.0.0
 
 trigger: none
 
 parameters:
 - name: sandbox
-  displayName: Deploy ECR to SAMC
+  displayName: Deploy SAMC
   type: boolean
-  default: true
-
+  default: false
 - name: terrformPLANonly
   displayName: tfPlanOnly (check == true)
   type: boolean
   default: false
 
 stages:
-- template: deploy/tf-create-infra-template.yml@templates
-  parameters:
-    environment: sandbox
-    environmentDisplayName: sandbox
-
-    tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-    awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-    tfVersion: 1.13.3
-
-    reqS3Mod: false                 # ECR only
-    application: ClientUptime
-    pipelineSrcDir: ecr             # run terraform from ecr/
-    tfPlanOnly: ${{ parameters.terrformPLANonly }}
-    regionName: us-east-1
-
-    # IMPORTANT: pass path and repo alias separately
-    checkoutTemplate: ecr/gitCheckouts.yml
-    checkoutTemplateRepo: self
+  - template: deploy/tf-create-infra-template.yml@templates
+    parameters:
+      environment: sandbox
+      environmentDisplayName: sandbox
+      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+      tfVersion: 1.13.3
+      application: ClientUptime
+      pipelineSrcDir: $(Build.Repository.Name)
+      tfPlanOnly: ${{ parameters.terrformPLANonly }}
+      regionName: us-east-1
+      checkoutTemplate: gitCheckouts.yml
