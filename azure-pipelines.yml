@@ -4,16 +4,16 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/deploy-templates
       ref: refs/tags/6.45.0
-    
+
     - repository: synthetic-canary-alarm
       type: git
       name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
       ref: refs/tags/2.2.0
 
-    - repository: sns-subtopic 
+    - repository: sns-subtopic
       type: git
       name: DEVOPS_Platform_as_a_Service/sns-subtopic
-      ref: refs/tags/1.0.0  
+      ref: refs/tags/1.0.0
 
     - repository: iam-controls
       type: git
@@ -24,36 +24,41 @@ resources:
       type: git
       name: DEVOPS_Platform_as_a_Service/alarm-aggregator
       ref: refs/tags/2.0.2
-  
+
     - repository: s3
-      type: git 
+      type: git
       name: DEVOPS_Platform_as_a_Service/s3
       ref: refs/tags/4.2.0
 
 trigger: none
+pr: none
 
 parameters:
-- name: Sandbox
-  displayName: Deploy DEMO canary to SAMC Observability Account
-  type: boolean
-  default: false
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: true
+  - name: Sandbox
+    displayName: Deploy DEMO canary to SAMC Observability Account
+    type: boolean
+    default: false
+
+  # fixed the typo: terrformPLANonly -> terraformPlanOnly
+  - name: terraformPlanOnly
+    displayName: tfPlanOnly (check == true)
+    type: boolean
+    default: true
 
 stages:
-- ${{ if eq(parameters.Sandbox, true) }}:
-  - template: deploy/tf-create-infra-template.yml@templates
-    parameters:
-      environment: sandbox
-      environmentDisplayName: Sandbox
-      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-      tfVersion: 1.9.8
-      application: sandbox
-      pipelineSrcDir: $(Build.Repository.Name)
-      tfPlanOnly: ${{ parameters.terrformPLANonly }}
-      regionName: us-east-1
-      checkoutTemplate: synthetic-canaries-checkouts.yml
-      reqS3Mod: true
+  - ${{ if eq(parameters.Sandbox, true) }}:
+    - template: deploy/tf-create-infra-template.yml@templates
+      parameters:
+        environment: sandbox
+        environmentDisplayName: Sandbox
+        # quote names with spaces and dashes
+        tfServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations"
+        awsServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
+        tfVersion: "1.9.8"
+        application: ClientUptime
+        pipelineSrcDir: $(Build.Repository.Name)
+        tfPlanOnly: ${{ parameters.terraformPlanOnly }}
+        regionName: us-east-1
+        # this file lives in this repo (self)
+        checkoutTemplate: synthetic-canaries-checkouts.yml
+        reqS3Mod: true
