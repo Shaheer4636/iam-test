@@ -1,63 +1,27 @@
+provider "aws" {
+  region = var.region
+}
 
+module "sns-subtopic" {
+  source       = "./sns-subtopic"
+  email_list   = var.email_list
+  pagerDuty_ep = var.pagerduty_ep
+  env          = var.env
+  appname      = var.appname
+  network_type = var.network_type
+  tags         = local.tags
+  region       = var.region
+}
 
-│ Error: Module not installed
-│ 
-│   on synthetic-canary-alarm/cloudwatch_alarm_agregator.tf line 1:
-│    1: module "alarm_aggregator" {
-│ 
-│ This module's local cache directory  could not be read. Run "terraform
-│ init" to install all modules required by this configuration.
-╵
+module "canary" {
+  source         = "./canary"
+  appname        = var.appname
+  env            = var.env
+  region         = var.region
+  monitoring_url = "https://citi-embtrust-prod.situsamc.com/"
+  canary_name    = "demo-promerit-sit"
 
-╷
-│ Error: Module not installed
-│ 
-│   on synthetic-canary-alarm/s3_artifact_location_bucket.tf line 1:
-│    1: module "s3_artifact_location_bucket" {
-│ 
-│ This module's local cache directory  could not be read. Run "terraform
-│ init" to install all modules required by this configuration.
-╵
-
-/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform plan --var-file vars/sandbox.tfvars -var=artifactory_user=asdfa -var=artifactory_pass=Fake -out tfplan -detailed-exitcode
-╷
-│ Error: Attribute redefined
-│ 
-│   on vars/sandbox.tfvars line 9:
-│    9: region               = "***"
-│ 
-│ The argument "region" was already set at vars/sandbox.tfvars:2,1-7. Each
-│ argument may be set only once.
-╵
-##[error]Error: Terraform Plan failed with exit code: 1
-Finishing: Terraform plan - TpbanQ╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "alarm_aggregator" at
-│ synthetic-canary-alarm/cloudwatch_alarm_agregator.tf:1.
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ Unable to evaluate directory symlink: lstat s3: no such file or directory
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "s3_artifact_location_bucket"
-│ at synthetic-canary-alarm/s3_artifact_location_bucket.tf:1.
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ Unable to evaluate directory symlink: lstat sns-subtopic: no such file or
-│ directory
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "sns-subtopic" at main.tf:7.
-╵
-##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
-Finishing: Terraform Init - TiNmvh
+  critical_notification_sns = module.sns-subtopic.critical_notification_sns
+  high_notification_sns     = module.sns-subtopic.high_notification_sns
+  medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+}
