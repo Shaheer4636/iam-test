@@ -2,26 +2,16 @@ provider "aws" {
   region = var.region
 }
 
-module "sns-subtopic" {
-  source       = "./sns-subtopic"
-  email_list   = var.email_list
-  pagerDuty_ep = var.pagerduty_ep
-  env          = var.env
-  appname      = var.appname
-  network_type = var.network_type
-  tags         = local.tags
-  region       = var.region
-}
+module "canary-promerit-demo-sit" {
+  source         = "../synthetic-canary-alarm"
 
-module "canary" {
-  source         = "./canary"
   appname        = var.appname
   env            = var.env
   region         = var.region
-  monitoring_url = "https://citi-embtrust-prod.situsamc.com/"
-  canary_name    = "demo-promerit-sit"
+  monitoring_url = var.monitoring_url
+  canary_name    = var.canary_name
 
-  critical_notification_sns = module.sns-subtopic.critical_notification_sns
-  high_notification_sns     = module.sns-subtopic.high_notification_sns
-  medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+  critical_notification_sns = var.critical_notification_sns
+  high_notification_sns     = var.high_notification_sns
+  medium_notification_sns   = var.medium_notification_sns
 }
