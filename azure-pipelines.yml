@@ -1,73 +1,31 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/6.45.0
-    - repository: synthetic-canary-alarm
-      type: git
-      name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
-      ref: refs/tags/2.2.0
-    - repository: sns-subtopic
-      type: git
-      name: DEVOPS_Platform_as_a_Service/sns-subtopic
-      ref: refs/tags/1.0.0
-    - repository: iam-controls
-      type: git
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.27.0
-    - repository: alarm-aggregator
-      type: git
-      name: DEVOPS_Platform_as_a_Service/alarm-aggregator
-      ref: refs/tags/2.0.2
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-
-trigger: none
-
-# Vars
-variables:
-- group: ArtifactoryReadOnlyAcct
-# make TF non-interactive and add safe defaults to plan without changing the template
-- name: TF_INPUT
-  value: 'false'
-- name: TF_CLI_ARGS_plan
-  value: '-input=false -lock-timeout=5m -no-color'
-# pass-through (harmless if names match already)
-- name: artifactory_user
-  value: $(artifactory_user)
-- name: artifactory_pass
-  value: $(artifactory_pass)
-
-parameters:
-- name: terraformVersion
-  displayName: Terraform Version
-  type: string
-  default: '1.9.8'
-- name: terrformPLANonly
-  displayName: tfPlanOnly (check == true)
-  type: boolean
-  default: true
-- name: Sandbox
-  displayName: Deploy to Sandbox
-  type: boolean
-  default: true   # set true so stage runs unless you turn it off at runtime
-
-stages:
-- ${{ if eq(parameters.Sandbox, true) }}:
-  - template: deploy/tf-create-infra-template.yml@templates
-    parameters:
-      environment: sandbox
-      environmentDisplayName: Sandbox
-      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
-      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
-      tfVersion: ${{ parameters.terraformVersion }}
-      application: ClientUptime
-      # IMPORTANT: this is where the template expects to find your repo root
-      pipelineSrcDir: $(Build.Repository.Name)
-      tfPlanOnly: ${{ parameters.terrformPLANonly }}
-      regionName: us-east-1
-      # This file (below) performs all checkouts into s/<repo-name>/...
-      checkoutTemplate: gitCheckouts.yml
+│ certain "global" settings to all configurations in your organization. To
+│ reduce the verbosity of these warnings, use the -compact-warnings option.
+╵
+╷
+│ Warning: Values for undeclared variables
+│ 
+│ In addition to the other similar warnings shown, 2 other variable(s)
+│ defined without being declared.
+╵
+╷
+│ Error: No value for required variable
+│ 
+│   on variables.tf line 24:
+│   24: variable "email_list" {
+│ 
+│ The root module input variable "email_list" is not set, and has no default
+│ value. Use a -var or -var-file command line argument to provide a value for
+│ this variable.
+╵
+╷
+│ Error: No value for required variable
+│ 
+│   on variables.tf line 28:
+│   28: variable "pagerduty_ep" {
+│ 
+│ The root module input variable "pagerduty_ep" is not set, and has no
+│ default value. Use a -var or -var-file command line argument to provide a
+│ value for this variable.
+╵
+##[error]Error: Terraform Plan failed with exit code: 1
+Finishing: Terraform plan - TpbanQ
