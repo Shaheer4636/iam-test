@@ -1,3 +1,80 @@
-network_type     = "production"
-artifactory_user = "your-user"
-artifactory_pass = "your-pass"
+# azure-pipelines.yml
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/6.45.0
+    - repository: synthetic-canary-alarm
+      type: git
+      name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
+      ref: refs/tags/2.2.0
+    - repository: sns-subtopic
+      type: git
+      name: DEVOPS_Platform_as_a_Service/sns-subtopic
+      ref: refs/tags/1.0.0
+    - repository: iam-controls
+      type: git
+      name: DEVOPS_Platform_as_a_Service/iam-controls
+      ref: refs/tags/2.27.0
+    - repository: alarm-aggregator
+      type: git
+      name: DEVOPS_Platform_as_a_Service/alarm-aggregator
+      ref: refs/tags/2.0.2
+    - repository: s3
+      type: git
+      name: DEVOPS_Platform_as_a_Service/s3
+      ref: refs/tags/4.2.0
+
+trigger: none
+pr: none
+
+# 1) Bring in the variable group (plain variables)
+variables:
+- group: ArtifactoryReadOnlyAcct
+# If the group already uses these exact keys, nothing else is needed.
+# (Optional no-op aliasing; harmless if kept)
+- name: artifactory_user
+  value: $(artifactory_user)
+- name: artifactory_pass
+  value: $(artifactory_pass)
+
+parameters:
+- name: Sandbox
+  displayName: Deploy DEMO canary to SAMC Observability Account
+  type: boolean
+  default: false
+- name: terraformPlanOnly
+  displayName: tfPlanOnly (check == true)
+  type: boolean
+  default: true
+
+stages:
+# 2) Checkout all repos into the expected folder layout
+- stage: CheckoutRepos
+  displayName: Checkout required repos
+  jobs:
+    - job: Checkout
+      steps:
+        - template: gitCheckouts.yml
+
+# 3) Deploy stage (unchanged template usage)
+- ${{ if eq(parameters.Sandbox, true) }}:
+  - stage: DeploySandbox
+    displayName: Deploy to Sandbox
+    dependsOn: CheckoutRepos
+    jobs:
+      - template: deploy/tf-create-infra-template.yml@templates
+        parameters:
+          environment: sandbox
+          environmentDisplayName: Sandbox
+          tfServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations"
+          awsServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
+          tfVersion: "1.9.8"
+          application: ClientUptime
+          pipelineSrcDir: $(Build.Repository.Name)
+          tfPlanOnly: ${{ parameters.terraformPlanOnly }}
+          regionName: us-east-1
+          checkoutTemplate: gitCheckouts.yml
+          reqS3Mod: true
