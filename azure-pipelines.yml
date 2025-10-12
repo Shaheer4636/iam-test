@@ -1,18 +1,31 @@
-steps:
-- checkout: self
-  path: s/$(Build.Repository.Name)
-
-- checkout: synthetic-canary-alarm
-  path: s/$(Build.Repository.Name)/synthetic-canary-alarm
-
-- checkout: sns-subtopic
-  path: s/$(Build.Repository.Name)/sns-subtopic
-
-- checkout: alarm-aggregator
-  path: s/$(Build.Repository.Name)/alarm-aggregator
-
-- checkout: s3
-  path: s/$(Build.Repository.Name)/s3
-
-- checkout: iam-controls
-  path: s/$(Build.Repository.Name)/iam-controls
+Version      : 0.203.0
+Author       : Microsoft Corporation
+Help         : [Learn more about this task](https://aka.ms/AAf1a0u)
+==============================================================================
+/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform validate
+╷
+│ Error: Missing required argument
+│ 
+│   on main.tf line 16, in module "canary":
+│   16: module "canary" {
+│ 
+│ The argument "artifactory_pass" is required, but no definition was found.
+╵
+╷
+│ Error: Missing required argument
+│ 
+│   on main.tf line 16, in module "canary":
+│   16: module "canary" {
+│ 
+│ The argument "network_type" is required, but no definition was found.
+╵
+╷
+│ Error: Missing required argument
+│ 
+│   on main.tf line 16, in module "canary":
+│   16: module "canary" {
+│ 
+│ The argument "artifactory_user" is required, but no definition was found.
+╵
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
+Finishing: Terraform validate - TVMmE4
