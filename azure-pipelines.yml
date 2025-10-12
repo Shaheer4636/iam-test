@@ -1,31 +1,19 @@
-/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform init -backend-config=bucket=samc-tfstate-***-clientuptime-sandbox-all -backend-config=key=sandbox.tfstate -backend-config=region=*** -backend-config=access_key=*** -backend-config=secret_key=***
-Initializing the backend...
-Initializing modules...
-- canary in canary
-- canary.canary-promerit-demo-sit in
-- sns-subtopic in
-╷
-│ Error: Unreadable module directory
-│ 
-│ Unable to evaluate directory symlink: lstat synthetic-canary-alarm: no such
-│ file or directory
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "canary-promerit-demo-sit" at
-│ canary/main.tf:5.
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ Unable to evaluate directory symlink: lstat sns-subtopic: no such file or
-│ directory
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "sns-subtopic" at main.tf:5.
-╵
-##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
-Finishing: Terraform Init - TiNmvh
+# gitCheckout.yml
+steps:
+- checkout: self
+  path: s/$(Build.Repository.Name)
+
+- checkout: synthetic-canary-alarm
+  path: s/$(Build.Repository.Name)/synthetic-canary-alarm
+
+- checkout: sns-subtopic
+  path: s/$(Build.Repository.Name)/sns-subtopic
+
+- checkout: alarm-aggregator
+  path: s/$(Build.Repository.Name)/alarm-aggregator
+
+- checkout: s3
+  path: s/$(Build.Repository.Name)/s3
+
+- checkout: iam-controls
+  path: s/$(Build.Repository.Name)/iam-controls
