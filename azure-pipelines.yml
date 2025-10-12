@@ -1,17 +1,31 @@
-provider "aws" {
-  region = var.region
-}
-
-module "canary-promerit-demo-sit" {
-  source         = "../synthetic-canary-alarm"   # one level up from canary/
-
-  appname        = var.appname
-  env            = var.env
-  region         = var.region
-  monitoring_url = var.monitoring_url
-  canary_name    = var.canary_name
-
-  critical_notification_sns = var.critical_notification_sns
-  high_notification_sns     = var.high_notification_sns
-  medium_notification_sns   = var.medium_notification_sns
-}
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ The directory  could not be read for module "alarm_aggregator" at
+│ synthetic-canary-alarm/cloudwatch_alarm_agregator.tf:1.
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ Unable to evaluate directory symlink: lstat s3: no such file or directory
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ The directory  could not be read for module "s3_artifact_location_bucket"
+│ at synthetic-canary-alarm/s3_artifact_location_bucket.tf:1.
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ Unable to evaluate directory symlink: lstat sns-subtopic: no such file or
+│ directory
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ The directory  could not be read for module "sns-subtopic" at main.tf:7.
+╵
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
+Finishing: Terraform Init - TiNmvh
