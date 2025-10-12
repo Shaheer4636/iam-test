@@ -1,64 +1,26 @@
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "sns-subtopic" at main.tf:23.
-╵
-╷
-│ Error: Invalid module source address
-│ 
-│   on main.tf line 7, in module "synthetic-canary-alarm":
-│    7:   source         = "synthetic-canary-alarm"
-│ 
-│ Terraform failed to determine your intended installation method for remote
-│ module package "synthetic-canary-alarm".
-│ 
-│ If you intended this as a path relative to the current module, use
-│ "./synthetic-canary-alarm" instead. The "./" prefix indicates that the
-│ address is a relative filesystem path.
-╵
-╷
-│ Error: Duplicate provider configuration
-│ 
-│   on main.tf line 19:
-│   19: provider "aws" {
-│ 
-│ A default (non-aliased) provider configuration for "aws" was already given
-│ at main.tf:2,1-15. If multiple configurations are required, set the "alias"
-│ argument for alternative configurations.
-╵
-##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
-Finishing: Terraform Init - TiNmvh
+# Root -> create SNS topics
+module "sns-subtopic" {
+  source       = "./sns-subtopic"   # <- MUST start with ./
+  email_list   = var.email_list
+  pagerDuty_ep = var.pagerduty_ep
+  env          = var.env
+  appname      = var.appname
+  network_type = var.network_type
+  tags         = local.tags
+  region       = var.region
+}
 
+# Root -> call the canary wrapper (which calls synthetic-canary-alarm inside)
+module "canary" {
+  source         = "./canary"        # <- MUST start with ./
 
-│ A default (non-aliased) provider configuration for "aws" was already given
-│ at main.tf:2,1-15. If multiple configurations are required, set the "alias"
-│ argument for alternative configurations.
-╵
+  appname        = var.appname
+  env            = var.env
+  region         = var.region
+  monitoring_url = "https://citi-embtrust-prod.situsamc.com/"
+  canary_name    = "demo-promerit-sit"
 
-/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform plan --var-file vars/sandbox.tfvars -var=artifactory_user=asdfa -var=artifactory_pass=Fake -out tfplan -detailed-exitcode
-╷
-│ Error: Invalid module source address
-│ 
-│   on main.tf line 7, in module "synthetic-canary-alarm":
-│    7:   source         = "synthetic-canary-alarm"
-│ 
-│ Terraform failed to determine your intended installation method for remote
-│ module package "synthetic-canary-alarm".
-│ 
-│ If you intended this as a path relative to the current module, use
-│ "./synthetic-canary-alarm" instead. The "./" prefix indicates that the
-│ address is a relative filesystem path.
-╵
-╷
-│ Error: Duplicate provider configuration
-│ 
-│   on main.tf line 19:
-│   19: provider "aws" {
-│ 
-│ A default (non-aliased) provider configuration for "aws" was already given
-│ at main.tf:2,1-15. If multiple configurations are required, set the "alias"
-│ argument for alternative configurations.
-╵
-##[error]Error: Terraform Plan failed with exit code: 1
-Finishing: Terraform plan - TpbanQ
+  critical_notification_sns = module.sns-subtopic.critical_notification_sns
+  high_notification_sns     = module.sns-subtopic.high_notification_sns
+  medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+}
