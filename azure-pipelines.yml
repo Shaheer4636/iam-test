@@ -26,9 +26,16 @@ resources:
       ref: refs/tags/4.2.0
 
 trigger: none
+
+# Vars
 variables:
 - group: ArtifactoryReadOnlyAcct
-# optional passthrough (harmless if keys already match)
+# make TF non-interactive and add safe defaults to plan without changing the template
+- name: TF_INPUT
+  value: 'false'
+- name: TF_CLI_ARGS_plan
+  value: '-input=false -lock-timeout=5m -no-color'
+# pass-through (harmless if names match already)
 - name: artifactory_user
   value: $(artifactory_user)
 - name: artifactory_pass
@@ -46,8 +53,7 @@ parameters:
 - name: Sandbox
   displayName: Deploy to Sandbox
   type: boolean
-  default: false
-
+  default: true   # set true so stage runs unless you turn it off at runtime
 
 stages:
 - ${{ if eq(parameters.Sandbox, true) }}:
@@ -59,7 +65,9 @@ stages:
       awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
       tfVersion: ${{ parameters.terraformVersion }}
       application: ClientUptime
+      # IMPORTANT: this is where the template expects to find your repo root
       pipelineSrcDir: $(Build.Repository.Name)
       tfPlanOnly: ${{ parameters.terrformPLANonly }}
       regionName: us-east-1
+      # This file (below) performs all checkouts into s/<repo-name>/...
       checkoutTemplate: gitCheckouts.yml
