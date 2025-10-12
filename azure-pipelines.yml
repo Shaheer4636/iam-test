@@ -1,51 +1,15 @@
-Skip to main content
-Azure DevOps
-samcado
-/
-Infrastructure Operations
-/
-Pipelines
-/
-Client-Uptime-Report-obs (2796)
-/
-20251012.12
-Search
+#[warning]Unable to expand variable 'artifactory_user'. A cyclical reference was detected.
+Pool: Azure Pipelines
+Image: ubuntu-latest
+Agent: Hosted Agent
+Started: Today at 4:04 PM
+Duration: 7s
 
-
-
-
-
-Account manager for Brenda Kenne
-Infrastructure Operations
-
-Overview
-
-Repos
-
-Pipelines
-Pipelines
-Environments
-Releases
-Library
-Task groups
-Deployment groups
-Build Tags
-
-Artifacts
-
-Portfolio++
-
-7pace Timetracker
-Project settings
-
-Jobs in run #20251012.12
-Terraform Pipeline (SitusAMC DevOps) - SiADoT
-
-  artifactory_user: $[ variablegroups.ArtifactoryReadOnlyAcct.artifactory_user ]
-  AZ_GIT_USERNAME: $[ variablegroups.AzureGitCreds.AZ_GIT_USERNAME ]
-  AZ_GIT_PAT: $[ variablegroups.AzureGitCreds.AZ_GIT_PAT ]
+Job preparation parameters
+Variables:
+  artifactory_auth: $[ variablegroups.ArtifactoryReadOnlyAcct.artifactory_auth ]
 ContinueOnError: False
-TimeoutInMinutes: 0
+TimeoutInMinutes: 60
 CancelTimeoutInMinutes: 5
 Expand:
   MaxConcurrency: 0
@@ -67,31 +31,3 @@ Template and static variable resolution complete. Final runtime YAML document:
 steps: []
 
 
-  MaxConcurrency: 0
-Parent pipeline used these runtime parameters
-Sandbox : "true"
-terraformPlanOnly : "True"
-
-Row 3
-
-Showing 25 filtered items.
-
-Get started and run this pipeline for the first time!
-
-Showing 33 filtered items.
-
-Showing 25 filtered items.
-
-Row 2
-
-Row 2
-
-Row 2
-
-Showing 10 filtered items.
-
-Get started and run this pipeline for the first time!
-
-Row 2
-
-Row 3
