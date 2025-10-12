@@ -1,31 +1,18 @@
-│   10:   region         = var.region
-│ 
-│ An input variable with the name "region" has not been declared. This
-│ variable can be declared with a variable "region" {} block.
-╵
-╷
-│ Error: Reference to undeclared module
-│ 
-│   on main.tf line 14, in module "canary-promerit-demo-sit":
-│   14:   critical_notification_sns = module.sns-subtopic.critical_notification_sns
-│ 
-│ No module call named "sns-subtopic" is declared in the root module.
-╵
-╷
-│ Error: Reference to undeclared module
-│ 
-│   on main.tf line 15, in module "canary-promerit-demo-sit":
-│   15:   high_notification_sns     = module.sns-subtopic.high_notification_sns
-│ 
-│ No module call named "sns-subtopic" is declared in the root module.
-╵
-╷
-│ Error: Reference to undeclared module
-│ 
-│   on main.tf line 16, in module "canary-promerit-demo-sit":
-│   16:   medium_notification_sns   = module.sns-subtopic.medium_notification_sns
-│ 
-│ No module call named "sns-subtopic" is declared in the root module.
-╵
-##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
-Finishing: Terraform validate - TVMmE4
+# canary folder
+provider "aws" {
+  region = "us-east-1"
+}
+
+module "synthetic-canary-alarm" {
+  source         = "synthetic-canary-alarm"
+  appname        = var.appname
+  env            = var.env
+  region         = var.region
+  monitoring_url = "https://citi-embtrust-prod.situsamc.com/"
+  canary_name    = "demo-promerit-sit"
+
+  critical_notification_sns = module.sns-subtopic.critical_notification_sns
+  high_notification_sns     = module.sns-subtopic.high_notification_sns
+  medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+}
+
