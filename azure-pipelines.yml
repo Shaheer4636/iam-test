@@ -1,31 +1,21 @@
-│ certain "global" settings to all configurations in your organization. To
-│ reduce the verbosity of these warnings, use the -compact-warnings option.
-╵
-╷
-│ Warning: Values for undeclared variables
-│ 
-│ In addition to the other similar warnings shown, 2 other variable(s)
-│ defined without being declared.
-╵
-╷
-│ Error: No value for required variable
-│ 
-│   on variables.tf line 24:
-│   24: variable "email_list" {
-│ 
-│ The root module input variable "email_list" is not set, and has no default
-│ value. Use a -var or -var-file command line argument to provide a value for
-│ this variable.
-╵
-╷
-│ Error: No value for required variable
-│ 
-│   on variables.tf line 28:
-│   28: variable "pagerduty_ep" {
-│ 
-│ The root module input variable "pagerduty_ep" is not set, and has no
-│ default value. Use a -var or -var-file command line argument to provide a
-│ value for this variable.
-╵
-##[error]Error: Terraform Plan failed with exit code: 1
-Finishing: Terraform plan - TpbanQ
+variable "email_list" {
+  type = list(string)
+}
+
+variable "pagerduty_ep" {
+  type = string
+}
+
+
+
+
+
+# existing entries you already have …
+env          = "sandbox"
+appname      = "ClientUptime"
+region       = "us-east-1"       # only once
+network_type = "production"      # or whatever you use
+
+# NEW — satisfy required inputs
+email_list   = ["alerts@example.com", "oncall@example.com"]  # list of emails
+pagerduty_ep = "pd-oncall@example.com"                       # or your PD integration email/URL
