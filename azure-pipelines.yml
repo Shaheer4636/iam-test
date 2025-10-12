@@ -1,24 +1,28 @@
-variable "region" {
-  type    = string
-  default = "us-east-1"
+provider "aws" {
+  region = var.region
 }
 
-variable "env" {
-  type = string
+module "sns-subtopic" {
+  source       = "./sns-subtopic"
+  email_list   = var.email_list
+  pagerDuty_ep = var.pagerduty_ep
+  env          = var.env
+  appname      = var.appname
+  network_type = var.network_type
+  tags         = local.tags
+  region       = var.region
 }
 
-variable "appname" {
-  type = string
-}
+module "canary" {
+  source         = "./canary"
 
-variable "email_list" {
-  type = list(string)
-}
+  appname        = var.appname
+  env            = var.env
+  region         = var.region
+  monitoring_url = "https://citi-embtrust-prod.situsamc.com/"
+  canary_name    = "demo-promerit-sit"
 
-variable "pagerduty_ep" {
-  type = string
-}
-
-variable "network_type" {
-  type = string
+  critical_notification_sns = module.sns-subtopic.critical_notification_sns
+  high_notification_sns     = module.sns-subtopic.high_notification_sns
+  medium_notification_sns   = module.sns-subtopic.medium_notification_sns
 }
