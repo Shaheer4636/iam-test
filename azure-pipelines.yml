@@ -1,19 +1,17 @@
-variable "monitoring_url" {
-  type = string
+provider "aws" {
+  region = var.region
 }
 
-variable "canary_name" {
-  type = string
-}
+module "canary-promerit-demo-sit" {
+  source         = "../synthetic-canary-alarm"
 
-variable "critical_notification_sns" {
-  type = string
-}
+  appname        = var.appname
+  env            = var.env
+  region         = var.region
+  monitoring_url = var.monitoring_url
+  canary_name    = var.canary_name
 
-variable "high_notification_sns" {
-  type = string
-}
-
-variable "medium_notification_sns" {
-  type = string
+  critical_notification_sns = var.critical_notification_sns
+  high_notification_sns     = var.high_notification_sns
+  medium_notification_sns   = var.medium_notification_sns
 }
