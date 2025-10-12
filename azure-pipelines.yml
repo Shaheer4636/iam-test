@@ -1,11 +1,7 @@
-variable "email_list" {
-  type = list(string)
-}
-
 variable "pagerduty_ep" {
-  type = string
+  type    = string
+  default = ""    # makes it optional for nonprod
 }
-
 
 
 
