@@ -10,3 +10,9 @@ variable "artifactory_pass" {
   type      = string
   sensitive = true
 }
+
+
+
+network_type     = var.network_type
+artifactory_user = var.artifactory_user
+artifactory_pass = var.artifactory_pass
