@@ -1,64 +1,31 @@
-resources:
-  repositories:
-    - repository: templates
-      type: git
-      name: DEVOPS_Platform_as_a_Service/deploy-templates
-      ref: refs/tags/6.45.0
-    - repository: synthetic-canary-alarm
-      type: git
-      name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
-      ref: refs/tags/2.2.0
-    - repository: sns-subtopic
-      type: git
-      name: DEVOPS_Platform_as_a_Service/sns-subtopic
-      ref: refs/tags/1.0.0
-    - repository: iam-controls
-      type: git
-      name: DEVOPS_Platform_as_a_Service/iam-controls
-      ref: refs/tags/2.27.0
-    - repository: alarm-aggregator
-      type: git
-      name: DEVOPS_Platform_as_a_Service/alarm-aggregator
-      ref: refs/tags/2.0.2
-    - repository: s3
-      type: git
-      name: DEVOPS_Platform_as_a_Service/s3
-      ref: refs/tags/4.2.0
-
-trigger: none
-pr: none
-
-parameters:
-  - name: Sandbox
-    displayName: Deploy DEMO canary to SAMC Observability Account
-    type: boolean
-    default: false
-  - name: terraformPlanOnly
-    displayName: tfPlanOnly (check == true)
-    type: boolean
-    default: true
-
-stages:
-  # Always-present no-op so the pipeline has at least one stage
-  - stage: Start
-    displayName: Startup / Parameter Gate
-    jobs:
-      - job: NoOp
-        steps:
-          - script: echo "Set 'Sandbox' to true to run the deploy stage."
-
-  # Deploy stage only included when Sandbox=true
-  - ${{ if eq(parameters.Sandbox, true) }}:
-    - template: deploy/tf-create-infra-template.yml@templates
-      parameters:
-        environment: sandbox
-        environmentDisplayName: Sandbox
-        tfServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations"
-        awsServiceConnection: "SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations"
-        tfVersion: "1.9.8"
-        application: ClientUptime
-        pipelineSrcDir: $(Build.Repository.Name)
-        tfPlanOnly: ${{ parameters.terraformPlanOnly }}
-        regionName: us-east-1
-        checkoutTemplate: synthetic-canaries-checkouts.yml
-        reqS3Mod: true
+│   10:   region         = var.region
+│ 
+│ An input variable with the name "region" has not been declared. This
+│ variable can be declared with a variable "region" {} block.
+╵
+╷
+│ Error: Reference to undeclared module
+│ 
+│   on main.tf line 14, in module "canary-promerit-demo-sit":
+│   14:   critical_notification_sns = module.sns-subtopic.critical_notification_sns
+│ 
+│ No module call named "sns-subtopic" is declared in the root module.
+╵
+╷
+│ Error: Reference to undeclared module
+│ 
+│   on main.tf line 15, in module "canary-promerit-demo-sit":
+│   15:   high_notification_sns     = module.sns-subtopic.high_notification_sns
+│ 
+│ No module call named "sns-subtopic" is declared in the root module.
+╵
+╷
+│ Error: Reference to undeclared module
+│ 
+│   on main.tf line 16, in module "canary-promerit-demo-sit":
+│   16:   medium_notification_sns   = module.sns-subtopic.medium_notification_sns
+│ 
+│ No module call named "sns-subtopic" is declared in the root module.
+╵
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
+Finishing: Terraform validate - TVMmE4
