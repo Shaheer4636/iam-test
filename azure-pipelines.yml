@@ -1,15 +1,12 @@
-#[warning]Unable to expand variable 'artifactory_user'. A cyclical reference was detected.
-Pool: Azure Pipelines
-Image: ubuntu-latest
-Agent: Hosted Agent
-Started: Today at 4:04 PM
-Duration: 7s
 
-Job preparation parameters
 Variables:
   artifactory_auth: $[ variablegroups.ArtifactoryReadOnlyAcct.artifactory_auth ]
+  artifactory_pass: $[ variablegroups.ArtifactoryReadOnlyAcct.artifactory_pass ]
+  artifactory_user: $[ variablegroups.ArtifactoryReadOnlyAcct.artifactory_user ]
+  AZ_GIT_USERNAME: $[ variablegroups.AzureGitCreds.AZ_GIT_USERNAME ]
+  AZ_GIT_PAT: $[ variablegroups.AzureGitCreds.AZ_GIT_PAT ]
 ContinueOnError: False
-TimeoutInMinutes: 60
+TimeoutInMinutes: 0
 CancelTimeoutInMinutes: 5
 Expand:
   MaxConcurrency: 0
@@ -31,3 +28,4 @@ Template and static variable resolution complete. Final runtime YAML document:
 steps: []
 
 
+  MaxConcurrency: 0
