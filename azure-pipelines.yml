@@ -1,17 +1,66 @@
-provider "aws" {
-  region = var.region
-}
+- canary.canary-promerit-demo-sit in synthetic-canary-alarm
+- canary.canary-promerit-demo-sit.alarm_aggregator in
+- canary.canary-promerit-demo-sit.iam-controls-for-canary-synthetic in iam-controls/modules
+- canary.canary-promerit-demo-sit.s3_artifact_location_bucket in s3
+- canary.canary-promerit-demo-sit.s3_artifact_location_bucket.s3 in s3/terraform-3.1.0-s3-bucket
+- sns-subtopic in
+╷
+│ Error: Unreadable module directory
+│ 
+│ Unable to evaluate directory symlink: lstat alarm-aggregator: no such file
+│ or directory
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ The directory  could not be read for module "alarm_aggregator" at
+│ synthetic-canary-alarm/cloudwatch_alarm_agregator.tf:1.
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ Unable to evaluate directory symlink: lstat sns-subtopic: no such file or
+│ directory
+╵
+╷
+│ Error: Unreadable module directory
+│ 
+│ The directory  could not be read for module "sns-subtopic" at main.tf:5.
+╵
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
+Finishing: Terraform Init - TiNmvh
 
-module "canary-promerit-demo-sit" {
-  source         = "../synthetic-canary-alarm"
 
-  appname        = var.appname
-  env            = var.env
-  region         = var.region
-  monitoring_url = var.monitoring_url
-  canary_name    = var.canary_name
 
-  critical_notification_sns = var.critical_notification_sns
-  high_notification_sns     = var.high_notification_sns
-  medium_notification_sns   = var.medium_notification_sns
-}
+
+│ Error: Module not installed
+│ 
+│   on main.tf line 5:
+│    5: module "sns-subtopic" {
+│ 
+│ This module's local cache directory  could not be read. Run "terraform
+│ init" to install all modules required by this configuration.
+╵
+
+╷
+│ Error: Module not installed
+│ 
+│   on synthetic-canary-alarm/cloudwatch_alarm_agregator.tf line 1:
+│    1: module "alarm_aggregator" {
+│ 
+│ This module's local cache directory  could not be read. Run "terraform
+│ init" to install all modules required by this configuration.
+╵
+
+/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform plan --var-file vars/sandbox.tfvars -var=artifactory_user=asdfa -var=artifactory_pass=Fake -out tfplan -detailed-exitcode
+╷
+│ Error: Attribute redefined
+│ 
+│   on vars/sandbox.tfvars line 9:
+│    9: region               = "***"
+│ 
+│ The argument "region" was already set at vars/sandbox.tfvars:2,1-7. Each
+│ argument may be set only once.
+╵
+##[error]Error: Terraform Plan failed with exit code: 1
+Finishing: Terraform plan - TpbanQ
