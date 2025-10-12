@@ -1,17 +1,4 @@
-variable "pagerduty_ep" {
-  type    = string
-  default = ""    # makes it optional for nonprod
-}
+email_list   = ["sre_team@situsamc.com"]   # put real email(s)
 
-
-
-
-# existing entries you already have …
-env          = "sandbox"
-appname      = "ClientUptime"
-region       = "us-east-1"       # only once
-network_type = "production"      # or whatever you use
-
-# NEW — satisfy required inputs
-email_list   = ["alerts@example.com", "oncall@example.com"]  # list of emails
-pagerduty_ep = "pd-oncall@example.com"                       # or your PD integration email/URL
+# do NOT set pagerduty_ep in nonprod (it’s optional now)
+# pagerduty_ep = ""   # not needed since we gave a default
