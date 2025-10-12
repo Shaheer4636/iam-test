@@ -1,17 +1,14 @@
-provider "aws" {
-  region = var.region
+output "critical_notification_sns" {
+  value       = aws_sns_topic.appname_env_monitoring_CRITICAL.arn
+  description = "SNS topic ARN for CRITICAL (SEVERE) alarms."
 }
 
-module "canary-promerit-demo-sit" {
-  source         = "../synthetic-canary-alarm"
+output "high_notification_sns" {
+  value       = aws_sns_topic.appname_env_monitoring_High.arn
+  description = "SNS topic ARN for HIGH (ALERT) alarms."
+}
 
-  appname        = var.appname
-  env            = var.env
-  region         = var.region
-  monitoring_url = var.monitoring_url
-  canary_name    = var.canary_name
-
-  critical_notification_sns = var.critical_notification_sns
-  high_notification_sns     = var.high_notification_sns
-  medium_notification_sns   = var.medium_notification_sns
+output "medium_notification_sns" {
+  value       = aws_sns_topic.appname_env_monitoring_medium.arn
+  description = "SNS topic ARN for MEDIUM (WARNING) alarms."
 }
