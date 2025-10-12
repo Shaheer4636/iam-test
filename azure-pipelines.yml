@@ -1,31 +1,19 @@
-Version      : 0.203.0
-Author       : Microsoft Corporation
-Help         : [Learn more about this task](https://aka.ms/AAf1a0u)
-==============================================================================
-/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform init -backend-config=bucket=samc-tfstate-***-clientuptime-sandbox-all -backend-config=key=sandbox.tfstate -backend-config=region=*** -backend-config=access_key=*** -backend-config=secret_key=***
-Initializing the backend...
+# gitCheckouts.yml
+steps:
+- checkout: self
+  path: .
 
-Successfully configured the backend "s3"! Terraform will automatically
-use this backend unless the backend configuration changes.
-Initializing modules...
-- canary in canary
-- canary.canary-promerit-demo-sit in synthetic-canary-alarm
-- canary.canary-promerit-demo-sit.alarm_aggregator in alarm-aggregator
-- canary.canary-promerit-demo-sit.alarm_aggregator.iam-controls in iam-controls/modules
-- canary.canary-promerit-demo-sit.iam-controls-for-canary-synthetic in iam-controls/modules
-- canary.canary-promerit-demo-sit.s3_artifact_location_bucket in s3
-- canary.canary-promerit-demo-sit.s3_artifact_location_bucket.s3 in s3/terraform-3.1.0-s3-bucket
-- sns-subtopic in
-╷
-│ Error: Unreadable module directory
-│ 
-│ Unable to evaluate directory symlink: lstat sns-subtopic: no such file or
-│ directory
-╵
-╷
-│ Error: Unreadable module directory
-│ 
-│ The directory  could not be read for module "sns-subtopic" at main.tf:5.
-╵
-##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
-Finishing: Terraform Init - TiNmvh
+- checkout: synthetic-canary-alarm
+  path: synthetic-canary-alarm
+
+- checkout: sns-subtopic
+  path: sns-subtopic
+
+- checkout: alarm-aggregator
+  path: alarm-aggregator
+
+- checkout: s3
+  path: s3
+
+- checkout: iam-controls
+  path: iam-controls
