@@ -1,4 +1,31 @@
-email_list   = ["sre_team@situsamc.com"]   # put real email(s)
-
-# do NOT set pagerduty_ep in nonprod (it’s optional now)
-# pagerduty_ep = ""   # not needed since we gave a default
+│ but a value was found in file "vars/sandbox.tfvars". If you meant to use
+│ this value, add a "variable" block to the configuration.
+│ 
+│ To silence these warnings, use TF_VAR_... environment variables to provide
+│ certain "global" settings to all configurations in your organization. To
+│ reduce the verbosity of these warnings, use the -compact-warnings option.
+╵
+╷
+│ Warning: Values for undeclared variables
+│ 
+│ In addition to the other similar warnings shown, 2 other variable(s)
+│ defined without being declared.
+╵
+╷
+│ Warning: Deprecated attribute
+│ 
+│   on s3/terraform-3.1.0-s3-bucket/main.tf line 26, in resource "aws_s3_bucket" "this":
+│   26:       acceleration_status,
+│ 
+│ The attribute "acceleration_status" is deprecated. Refer to the provider
+│ documentation for details.
+│ 
+│ (and 2 more similar warnings elsewhere)
+╵
+╷
+│ Error: reading ECR Repository (client-uptime-lambda): operation error ECR: DescribeRepositories, https response error StatusCode: 400, RequestID: f0d4939b-f4ee-4817-8f70-18098a282af5, api error AccessDeniedException: User: arn:aws:iam::492046385895:user/DEVOPSIACSVCVPC is not authorized to perform: ecr:DescribeRepositories on resource: arn:aws:ecr:***:492046385895:repository/client-uptime-lambda because no identity-based policy allows the ecr:DescribeRepositories action
+│ 
+│ 
+╵
+##[error]Error: Terraform Plan failed with exit code: 1
+Finishing: Terraform plan to destroy
