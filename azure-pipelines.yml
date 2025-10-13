@@ -1,13 +1,31 @@
-region       = "us-east-1"
-env          = "sandbox"
-appname      = "ClientUptime"
-network_type = "nonproduction"                # anything not equal to "production"
-email_list   = ["brendakenne@situsamc.com"]
-
-# keep only if you want to drive it; otherwise delete this line since default is null
-lifecycle_policy = null
-
-# do NOT set pagerduty_ep in nonprod (default "" is fine)
-
-# optional but recommended to avoid ECR permission errors during plan/destroy
-enable_ecr = false
+╷
+│ Warning: Deprecated attribute
+│ 
+│   on s3/terraform-3.1.0-s3-bucket/main.tf line 26, in resource "aws_s3_bucket" "this":
+│   26:       acceleration_status,
+│ 
+│ The attribute "acceleration_status" is deprecated. Refer to the provider
+│ documentation for details.
+│ 
+│ (and 2 more similar warnings elsewhere)
+╵
+╷
+│ Error: reading ECR Repository (client-uptime-lambda): operation error ECR: DescribeRepositories, https response error StatusCode: 400, RequestID: 4b955e7f-d156-4bdc-8897-06c9509197c9, api error AccessDeniedException: User: arn:aws:iam::492046385895:user/DEVOPSIACSVCVPC is not authorized to perform: ecr:DescribeRepositories on resource: arn:aws:ecr:***:492046385895:repository/client-uptime-lambda because no identity-based policy allows the ecr:DescribeRepositories action
+│ 
+│ 
+╵
+╷
+│ Error: Invalid value for variable
+│ 
+│   on main.tf line 11, in module "sns-subtopic":
+│   11:   network_type = var.network_type
+│     ├────────────────
+│     │ var.network_type is "nonproduction"
+│ 
+│ The network type (`network_type`) must be either `nonprod` or `production`.
+│ 
+│ This was checked by the validation rule at
+│ sns-subtopic/variables.tf:22,3-13.
+╵
+##[error]Error: Terraform Plan failed with exit code: 1
+Finishing: Terraform plan to destroy
