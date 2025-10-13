@@ -1,31 +1,31 @@
-╷
-│ Warning: Deprecated attribute
-│ 
-│   on s3/terraform-3.1.0-s3-bucket/main.tf line 26, in resource "aws_s3_bucket" "this":
-│   26:       acceleration_status,
-│ 
-│ The attribute "acceleration_status" is deprecated. Refer to the provider
-│ documentation for details.
-│ 
-│ (and 2 more similar warnings elsewhere)
-╵
-╷
-│ Error: reading ECR Repository (client-uptime-lambda): operation error ECR: DescribeRepositories, https response error StatusCode: 400, RequestID: 4b955e7f-d156-4bdc-8897-06c9509197c9, api error AccessDeniedException: User: arn:aws:iam::492046385895:user/DEVOPSIACSVCVPC is not authorized to perform: ecr:DescribeRepositories on resource: arn:aws:ecr:***:492046385895:repository/client-uptime-lambda because no identity-based policy allows the ecr:DescribeRepositories action
-│ 
+│   with module.canary.module.canary-promerit-demo-sit.module.alarm_aggregator.module.iam-controls.aws_iam_policy.manage_lambda_actions[0],
+│   on iam-controls/modules/alarm_aggregator_iam_policy.tf line 1, in resource "aws_iam_policy" "manage_lambda_actions":
+│    1: resource "aws_iam_policy" "manage_lambda_actions" {
 │ 
 ╵
 ╷
-│ Error: Invalid value for variable
+│ Error: creating IAM Role (clientuptime-sandbox-demo-promerit-sit-sc-lambda-access-agg-43gK): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: dfc2c4ed-3b6b-4773-b8fc-590300cc136d, EntityAlreadyExists: Role with name clientuptime-sandbox-demo-promerit-sit-sc-lambda-access-agg-43gK already exists.
 │ 
-│   on main.tf line 11, in module "sns-subtopic":
-│   11:   network_type = var.network_type
-│     ├────────────────
-│     │ var.network_type is "nonproduction"
+│   with module.canary.module.canary-promerit-demo-sit.module.alarm_aggregator.module.iam-controls.aws_iam_role.aggregator_lambda[0],
+│   on iam-controls/modules/alarm_aggregator_iam_role_for_lambda.tf line 1, in resource "aws_iam_role" "aggregator_lambda":
+│    1: resource "aws_iam_role" "aggregator_lambda" {
 │ 
-│ The network type (`network_type`) must be either `nonprod` or `production`.
-│ 
-│ This was checked by the validation rule at
-│ sns-subtopic/variables.tf:22,3-13.
 ╵
-##[error]Error: Terraform Plan failed with exit code: 1
-Finishing: Terraform plan to destroy
+╷
+│ Error: creating IAM Role (demo-promerit-sit-execution-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: d2af54b4-35f7-4555-9b3c-774aa70adc1d, EntityAlreadyExists: Role with name demo-promerit-sit-execution-role already exists.
+│ 
+│   with module.canary.module.canary-promerit-demo-sit.module.iam-controls-for-canary-synthetic.aws_iam_role.Synthetics_Lambda_Execution_Role[0],
+│   on iam-controls/modules/canary_syntetics_iam_policy_document.tf line 1, in resource "aws_iam_role" "Synthetics_Lambda_Execution_Role":
+│    1: resource "aws_iam_role" "Synthetics_Lambda_Execution_Role" {
+│ 
+╵
+╷
+│ Error: creating S3 Bucket (samc-***-clientuptime-sandbox-demo-promerit-sit-artifact): BucketAlreadyExists
+│ 
+│   with module.canary.module.canary-promerit-demo-sit.module.s3_artifact_location_bucket.module.s3.aws_s3_bucket.this[0],
+│   on s3/terraform-3.1.0-s3-bucket/main.tf line 14, in resource "aws_s3_bucket" "this":
+│   14: resource "aws_s3_bucket" "this" {
+│ 
+╵
+##[error]Error: The process '/ADOagent/_work/_tool/terraform/1.9.8/x64/terraform' failed with exit code 1
+Finishing: Terraform Apply - TACSyV
