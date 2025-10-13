@@ -21,16 +21,28 @@ variable "appname" {
   type = string
 }
 
+variable "network_type" {
+  type = string
+}
+
 variable "email_list" {
   type = list(string)
 }
 
+# PagerDuty only required in production; optional elsewhere
 variable "pagerduty_ep" {
   type    = string
-  default = ""    # makes it optional for nonprod
+  default = ""
 }
 
+# ADD: matches your tfvars (removes the undeclared-variable warning)
+variable "lifecycle_policy" {
+  type    = any
+  default = null
+}
 
-variable "network_type" {
-  type = string
+# ADD: lets you turn off any ECR lookups in this stack (avoids AccessDenied on plan)
+variable "enable_ecr" {
+  type    = bool
+  default = false
 }
