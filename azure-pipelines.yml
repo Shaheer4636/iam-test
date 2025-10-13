@@ -1,17 +1,36 @@
-# using for canary main.tf, commencted root main.tf
-region ="us-east-1"
+variable "artifactory_user" {
+  description = "READ ONLY JFrog user account - used to download CarbonBlack and Nessus agents from JFrog"
+  type        = string
+}
 
-#ecr
-// ecr_tags             = {}
-// image_tag_mutability = "MUTABLE"
-// ecr_name             = "test-container"
-lifecycle_policy     = null
-env                  = "sandbox"
-appname = "ClientUptime"
+variable "artifactory_pass" {
+  description = "READ ONLY JFrog user acount's pwd - used to download CarbonBlack and Nessus agents from JFrog"
+  type        = string
+}
+
+variable "region" {
+  type    = string
+  default = "us-east-1"
+}
+
+variable "env" {
+  type = string
+}
+
+variable "appname" {
+  type = string
+}
+
+variable "email_list" {
+  type = list(string)
+}
+
+variable "pagerduty_ep" {
+  type    = string
+  default = ""    # makes it optional for nonprod
+}
 
 
-# canary 
-network_type = "nonprod"
-
-
-email_list   = ["brendakenne@situsamc.com"]   # put real email(s)
+variable "network_type" {
+  type = string
+}
