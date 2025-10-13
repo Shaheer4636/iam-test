@@ -1,338 +1,73 @@
-{
-  "version": 4,
-  "terraform_version": "1.13.3",
-  "serial": 7,
-  "lineage": "fccf2068-d803-ee87-ee71-e152aa5ea6bc",
-  "outputs": {
-    "canary_role_arn": {
-      "value": "arn:aws:iam::492046385895:role/samc-obs-sandbox-canary-role-20251009194051031500000001",
-      "type": "string"
-    },
-    "canary_role_name": {
-      "value": "samc-obs-sandbox-canary-role-20251009194051031500000001",
-      "type": "string"
-    },
-    "ecr_repository_name": {
-      "value": "client-uptime-lambda",
-      "type": "string"
-    },
-    "lambdafunction_role_arn": {
-      "value": "arn:aws:iam::492046385895:role/samc-obs-sandbox-lambdafunction-role-20251009194051034500000003",
-      "type": "string"
-    },
-    "lambdafunction_role_name": {
-      "value": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003",
-      "type": "string"
-    }
-  },
-  "resources": [
-    {
-      "mode": "managed",
-      "type": "aws_ecr_repository",
-      "name": "client_uptime_lambda",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "status": "tainted",
-          "schema_version": 0,
-          "attributes": {
-            "arn": null,
-            "encryption_configuration": [
-              {
-                "encryption_type": "AES256",
-                "kms_key": ""
-              }
-            ],
-            "force_delete": true,
-            "id": "client-uptime-lambda",
-            "image_scanning_configuration": [
-              {
-                "scan_on_push": true
-              }
-            ],
-            "image_tag_mutability": "MUTABLE",
-            "image_tag_mutability_exclusion_filter": [],
-            "name": "client-uptime-lambda",
-            "region": "us-east-1",
-            "registry_id": null,
-            "repository_url": null,
-            "tags": null,
-            "tags_all": null,
-            "timeouts": null
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "private": "eyJlMmJmYjczMC1lY2FhLTExZTYtOGY4OC0zNDM2M2JjN2M0YzAiOnsiZGVsZXRlIjoxMjAwMDAwMDAwMDAwfX0="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_policy",
-      "name": "canary_full_access",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "attachment_count": 0,
-            "description": "Full S3 and CloudWatch/Logs for CloudWatch Synthetics canaries",
-            "id": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "name": "samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "name_prefix": "samc-obs-sandbox-canary-fullaccess-",
-            "path": "/",
-            "policy": "{\"Statement\":[{\"Action\":[\"s3:*\"],\"Effect\":\"Allow\",\"Resource\":[\"*\"],\"Sid\":\"S3Full\"},{\"Action\":[\"cloudwatch:*\"],\"Effect\":\"Allow\",\"Resource\":[\"*\"],\"Sid\":\"CloudWatchFull\"},{\"Action\":[\"logs:*\"],\"Effect\":\"Allow\",\"Resource\":[\"*\"],\"Sid\":\"LogsFull\"}],\"Version\":\"2012-10-17\"}",
-            "policy_id": "ANPAXFECAALT72UH2ERTS",
-            "tags": null,
-            "tags_all": {}
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002"
-          },
-          "private": "bnVsbA=="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_policy",
-      "name": "lambdafunction_full_access",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "attachment_count": 0,
-            "description": "Full S3, ECR (incl. public), and CloudWatch/Logs for Lambda functions",
-            "id": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "name": "samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "name_prefix": "samc-obs-sandbox-lambdafunction-fullaccess-",
-            "path": "/",
-            "policy": "{\"Statement\":[{\"Action\":[\"s3:*\"],\"Effect\":\"Allow\",\"Resource\":[\"*\"],\"Sid\":\"S3Full\"},{\"Action\":[\"ecr:*\",\"ecr-public:*\",\"ecr:GetAuthorizationToken\",\"sts:GetServiceBearerToken\"],\"Effect\":\"Allow\",\"Resource\":\"*\",\"Sid\":\"ECRFull\"},{\"Action\":[\"cloudwatch:*\"],\"Effect\":\"Allow\",\"Resource\":\"*\",\"Sid\":\"CloudWatchFull\"},{\"Action\":[\"logs:CreateLogGroup\",\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Effect\":\"Allow\",\"Resource\":\"arn:aws:logs:*:*:*\",\"Sid\":\"LogsFull\"}],\"Version\":\"2012-10-17\"}",
-            "policy_id": "ANPAXFECAALT65KAX54GD",
-            "tags": null,
-            "tags_all": {}
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004"
-          },
-          "private": "bnVsbA=="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_policy",
-      "name": "pipeline_ecr_permissions",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "arn": "arn:aws:iam::492046385895:policy/PipelineECRCreationPolicy",
-            "attachment_count": 1,
-            "description": "Allows creating ECR repositories for CI/CD pipelines",
-            "id": "arn:aws:iam::492046385895:policy/PipelineECRCreationPolicy",
-            "name": "PipelineECRCreationPolicy",
-            "name_prefix": "",
-            "path": "/",
-            "policy": "{\"Statement\":[{\"Action\":\"ecr:CreateRepository\",\"Effect\":\"Allow\",\"Resource\":\"*\"}],\"Version\":\"2012-10-17\"}",
-            "policy_id": "ANPAXFECAALTT3IRVOFLP",
-            "tags": {},
-            "tags_all": {}
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "arn": "arn:aws:iam::492046385895:policy/PipelineECRCreationPolicy"
-          },
-          "private": "bnVsbA=="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_role",
-      "name": "canary_role",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "arn": "arn:aws:iam::492046385895:role/samc-obs-sandbox-canary-role-20251009194051031500000001",
-            "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"synthetics.amazonaws.com\"},\"Sid\":\"SyntheticsAssumeRole\"}],\"Version\":\"2012-10-17\"}",
-            "create_date": "2025-10-09T19:40:51Z",
-            "description": "",
-            "force_detach_policies": false,
-            "id": "samc-obs-sandbox-canary-role-20251009194051031500000001",
-            "inline_policy": [],
-            "managed_policy_arns": [],
-            "max_session_duration": 3600,
-            "name": "samc-obs-sandbox-canary-role-20251009194051031500000001",
-            "name_prefix": "samc-obs-sandbox-canary-role-",
-            "path": "/",
-            "permissions_boundary": "",
-            "tags": null,
-            "tags_all": {},
-            "unique_id": "AROAXFECAALT7645YFLWN"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "account_id": "492046385895",
-            "name": "samc-obs-sandbox-canary-role-20251009194051031500000001"
-          },
-          "private": "bnVsbA=="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_role",
-      "name": "lambdafunction_role",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "arn": "arn:aws:iam::492046385895:role/samc-obs-sandbox-lambdafunction-role-20251009194051034500000003",
-            "assume_role_policy": "{\"Statement\":[{\"Action\":\"sts:AssumeRole\",\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"lambda.amazonaws.com\"},\"Sid\":\"LambdaAssumeRole\"}],\"Version\":\"2012-10-17\"}",
-            "create_date": "2025-10-09T19:40:51Z",
-            "description": "",
-            "force_detach_policies": false,
-            "id": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003",
-            "inline_policy": [],
-            "managed_policy_arns": [],
-            "max_session_duration": 3600,
-            "name": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003",
-            "name_prefix": "samc-obs-sandbox-lambdafunction-role-",
-            "path": "/",
-            "permissions_boundary": "",
-            "tags": null,
-            "tags_all": {},
-            "unique_id": "AROAXFECAALTR66COOGF4"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "account_id": "492046385895",
-            "name": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003"
-          },
-          "private": "bnVsbA=="
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_role_policy_attachment",
-      "name": "canary_attach",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "id": "samc-obs-sandbox-canary-role-20251009194051031500000001/arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "policy_arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "role": "samc-obs-sandbox-canary-role-20251009194051031500000001"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "account_id": "492046385895",
-            "policy_arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-canary-fullaccess-20251009194051031900000002",
-            "role": "samc-obs-sandbox-canary-role-20251009194051031500000001"
-          },
-          "private": "bnVsbA==",
-          "dependencies": [
-            "aws_iam_policy.canary_full_access",
-            "aws_iam_role.canary_role"
-          ]
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_role_policy_attachment",
-      "name": "lambdafunction_attach",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "id": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003/arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "policy_arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "role": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "account_id": "492046385895",
-            "policy_arn": "arn:aws:iam::492046385895:policy/samc-obs-sandbox-lambdafunction-fullaccess-20251009194051036600000004",
-            "role": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003"
-          },
-          "private": "bnVsbA==",
-          "dependencies": [
-            "aws_iam_policy.lambdafunction_full_access",
-            "aws_iam_role.lambdafunction_role"
-          ]
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_role_policy_attachment",
-      "name": "lambdafunction_basic_logs",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "id": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003/arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            "role": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "identity": {
-            "account_id": "492046385895",
-            "policy_arn": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
-            "role": "samc-obs-sandbox-lambdafunction-role-20251009194051034500000003"
-          },
-          "private": "bnVsbA==",
-          "dependencies": [
-            "aws_iam_role.lambdafunction_role"
-          ]
-        }
-      ]
-    },
-    {
-      "mode": "managed",
-      "type": "aws_iam_user_policy_attachment",
-      "name": "pipeline_ecr_attachment",
-      "provider": "provider[\"registry.terraform.io/hashicorp/aws\"]",
-      "instances": [
-        {
-          "schema_version": 0,
-          "attributes": {
-            "id": "DEVOPSIACSVCVPC-20251009193604771000000001",
-            "policy_arn": "arn:aws:iam::492046385895:policy/PipelineECRCreationPolicy",
-            "user": "DEVOPSIACSVCVPC"
-          },
-          "sensitive_attributes": [],
-          "identity_schema_version": 0,
-          "private": "bnVsbA==",
-          "dependencies": [
-            "aws_iam_policy.pipeline_ecr_permissions"
-          ]
-        }
-      ]
-    }
-  ],
-  "check_results": null
-}
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: DEVOPS_Platform_as_a_Service/deploy-templates
+      ref: refs/tags/6.45.0
+    - repository: synthetic-canary-alarm
+      type: git
+      name: DEVOPS_Platform_as_a_Service/synthetic-canary-alarm
+      ref: refs/tags/2.2.0
+    - repository: sns-subtopic
+      type: git
+      name: DEVOPS_Platform_as_a_Service/sns-subtopic
+      ref: refs/tags/1.0.0
+    - repository: iam-controls
+      type: git
+      name: DEVOPS_Platform_as_a_Service/iam-controls
+      ref: refs/tags/2.27.0
+    - repository: alarm-aggregator
+      type: git
+      name: DEVOPS_Platform_as_a_Service/alarm-aggregator
+      ref: refs/tags/2.0.2
+    - repository: s3
+      type: git
+      name: DEVOPS_Platform_as_a_Service/s3
+      ref: refs/tags/4.2.0
+
+trigger: none
+
+# Vars
+variables:
+- group: ArtifactoryReadOnlyAcct
+# make TF non-interactive and add safe defaults to plan without changing the template
+- name: TF_INPUT
+  value: 'false'
+- name: TF_CLI_ARGS_plan
+  value: '-input=false -lock-timeout=5m -no-color'
+# pass-through (harmless if names match already)
+- name: artifactory_user
+  value: $(artifactory_user)
+- name: artifactory_pass
+  value: $(artifactory_pass)
+
+parameters:
+- name: terraformVersion
+  displayName: Terraform Version
+  type: string
+  default: '1.9.8'
+- name: terrformPLANonly
+  displayName: tfPlanOnly (check == true)
+  type: boolean
+  default: true
+- name: Sandbox
+  displayName: Deploy to Sandbox
+  type: boolean
+  default: true   # set true so stage runs unless you turn it off at runtime
+
+stages:
+- ${{ if eq(parameters.Sandbox, true) }}:
+  - template: deploy/tf-create-infra-template.yml@templates
+    parameters:
+      environment: sandbox
+      environmentDisplayName: Sandbox
+      tfServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-us-east-1-Infrastructure Operations
+      awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
+      tfVersion: ${{ parameters.terraformVersion }}
+      application: ClientUptime
+      # IMPORTANT: this is where the template expects to find your repo root
+      pipelineSrcDir: $(Build.Repository.Name)
+      tfPlanOnly: ${{ parameters.terrformPLANonly }}
+      regionName: us-east-1
+      # This file (below) performs all checkouts into s/<repo-name>/...
+      checkoutTemplate: gitCheckouts.yml
