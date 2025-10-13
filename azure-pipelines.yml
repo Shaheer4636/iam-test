@@ -1,48 +1,13 @@
-variable "artifactory_user" {
-  description = "READ ONLY JFrog user account - used to download CarbonBlack and Nessus agents from JFrog"
-  type        = string
-}
+region       = "us-east-1"
+env          = "sandbox"
+appname      = "ClientUptime"
+network_type = "nonproduction"                # anything not equal to "production"
+email_list   = ["brendakenne@situsamc.com"]
 
-variable "artifactory_pass" {
-  description = "READ ONLY JFrog user acount's pwd - used to download CarbonBlack and Nessus agents from JFrog"
-  type        = string
-}
+# keep only if you want to drive it; otherwise delete this line since default is null
+lifecycle_policy = null
 
-variable "region" {
-  type    = string
-  default = "us-east-1"
-}
+# do NOT set pagerduty_ep in nonprod (default "" is fine)
 
-variable "env" {
-  type = string
-}
-
-variable "appname" {
-  type = string
-}
-
-variable "network_type" {
-  type = string
-}
-
-variable "email_list" {
-  type = list(string)
-}
-
-# PagerDuty only required in production; optional elsewhere
-variable "pagerduty_ep" {
-  type    = string
-  default = ""
-}
-
-# ADD: matches your tfvars (removes the undeclared-variable warning)
-variable "lifecycle_policy" {
-  type    = any
-  default = null
-}
-
-# ADD: lets you turn off any ECR lookups in this stack (avoids AccessDenied on plan)
-variable "enable_ecr" {
-  type    = bool
-  default = false
-}
+# optional but recommended to avoid ECR permission errors during plan/destroy
+enable_ecr = false
