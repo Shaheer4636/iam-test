@@ -30,12 +30,18 @@ trigger: none
 # Vars
 variables:
 - group: ArtifactoryReadOnlyAcct
-# make TF non-interactive and add safe defaults to plan without changing the template
+
+# Make Terraform fully non-interactive and skip remote refresh
 - name: TF_INPUT
   value: 'false'
 - name: TF_CLI_ARGS_plan
-  value: '-input=false -lock-timeout=5m -no-color'
-# pass-through (harmless if names match already)
+  value: '-refresh=false -input=false -lock-timeout=5m -no-color'
+- name: TF_CLI_ARGS_apply
+  value: '-refresh=false -input=false -lock-timeout=5m -auto-approve -no-color'
+- name: TF_CLI_ARGS_destroy
+  value: '-refresh=false -input=false -lock-timeout=5m -no-color'
+
+# pass-through (harmless if names already match)
 - name: artifactory_user
   value: $(artifactory_user)
 - name: artifactory_pass
@@ -53,11 +59,11 @@ parameters:
 - name: Sandbox
   displayName: Deploy to Sandbox
   type: boolean
-  default: true   # set true so stage runs unless you turn it off at runtime
+  default: false   # set true so stage runs unless you turn it off at runtime
 
 stages:
 - ${{ if eq(parameters.Sandbox, true) }}:
-  - template: deploy/tf-create-infra-template.yml@templates
+  - template: destroy/tfdestroy-infra-template.yml@templates
     parameters:
       environment: sandbox
       environmentDisplayName: Sandbox
@@ -65,9 +71,9 @@ stages:
       awsServiceConnection: SAMCObservability-492046385895-DEVOPSIACSVCVPC-Infrastructure Operations
       tfVersion: ${{ parameters.terraformVersion }}
       application: ClientUptime
-      # IMPORTANT: this is where the template expects to find your repo root
+      # where the template expects to find your repo root
       pipelineSrcDir: $(Build.Repository.Name)
       tfPlanOnly: ${{ parameters.terrformPLANonly }}
       regionName: us-east-1
-      # This file (below) performs all checkouts into s/<repo-name>/...
+      # performs all checkouts into s/<repo-name>/...
       checkoutTemplate: gitCheckouts.yml
